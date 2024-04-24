@@ -1,5 +1,34 @@
 from ctypes import *
 
+
+class ObstacleInformation(Structure):
+    _pack_ = 1
+    _fields_ = [
+        ("cls", c_uint8),
+        ("enu_x", c_double),
+        ("enu_y", c_double),
+        ("heading", c_double),
+        ("velocity", c_double)
+    ]
+
+class SharingInformation(Structure):
+    _pack_ = 1
+    _fields_ = [
+        ("tx_cnt", c_uint32),
+        ("rx_cnt", c_uint32),
+        ("state", c_uint8),
+        ("latitude", c_double),
+        ("longitude", c_double),
+        ("heading", c_double),
+        ("velocity", c_double),
+    
+        ("path_x", c_double*8),
+        ("path_y", c_double*8),
+        ("obstacle_num", c_uint16),
+        ("obstacle", ObstacleInformation*0)
+    ]
+
+
 class V2x_App_Hdr(Structure):
     _pack_ = 1
     _fields_ = [("magic", c_char * 4),
@@ -19,6 +48,14 @@ class V2x_App_Ext_TLVC(Structure):
     _fields_ = [("type", c_uint32),
                 ("len", c_uint16),
                 ("data", c_uint8 * 0)]  # Variable-sized data
+
+
+class V2x_App_SI_TLVC(Structure):
+    _pack_ = 1
+    _fields_ = [("type", c_uint32),
+                ("len", c_uint16),
+                ("data", SharingInformation)]  # Variable-sized data
+    
 
 class V2x_App_TxMsg(Structure):
     _pack_ = 1
@@ -55,10 +92,4 @@ class TLVC_STATUS_CommUnit(Structure):
         ("sw_ver", c_uint16),     # 2 bytes
         ("timestamp", c_uint64),  # 8 bytes
         ("crc", c_uint16)         # 2 bytes, 네트워크 바이트 오더
-    ]
-
-class DrivingInformation(Structure):
-    _pack_ = 1
-    _fields_ = [
-        
     ]

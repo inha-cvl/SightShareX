@@ -54,23 +54,55 @@ class SocketHandler:
 
         return self.send(data)
     
-    def tx(self, cnt):
-        p_overall,package_len = self.get_p_overall(cnt)
-        size = 4
-        p_dummy = cast(addressof(p_overall.contents) + sizeof(TLVC_Overall), POINTER(V2x_App_Ext_TLVC))
+    def tx(self, cnt, state, paths, obstacles):
+        p_overall = self.get_p_overall(cnt)
+        
+        # size = 4
+        # p_dummy = cast(addressof(p_overall.contents) + sizeof(TLVC_Overall), POINTER(V2x_App_Ext_TLVC))
+        # p_dummy.contents.type = socket.htonl(EM_PT_RAW_DATA)
+        # p_dummy.contents.len = socket.htons(size + 2)
+        # p_seq = cast(addressof(p_dummy.contents)+6, POINTER(c_uint32))
+        # p_seq.contents.value = socket.htonl(cnt+1) #sequence data input 
 
+        size = sizeof(V2x_App_SI_TLVC)+sizeof(ObstacleInformation)*len(obstacles)
+        p_dummy = cast(addressof(p_overall.contents) + sizeof(TLVC_Overall), POINTER(V2x_App_SI_TLVC))
         p_dummy.contents.type = socket.htonl(EM_PT_RAW_DATA)
         p_dummy.contents.len = socket.htons(size + 2)
-        p_seq = cast(addressof(p_dummy.contents)+6, POINTER(c_uint32))
-        p_seq.contents.value = socket.htonl(cnt+1) #sequence data input 
+
+        p_share_info = cast(addressof(p_dummy.contents.data), POINTER(SharingInformation))
+        p_share_info.contents.tx_cnt = socket.htonl(cnt)
+        p_share_info.contents.rx_cnt = socket.htonl(self.rx_cnt+8)
+        p_share_info.contents.state = state[0]
+        p_share_info.contents.latitude = state[1]
+        p_share_info.contents.longitude = state[2]
+        p_share_info.contents.heading = state[3]
+        p_share_info.contents.velocity = state[4]
+
+        for i, x in enumerate(paths[0]):
+            p_share_info.contents.path_x[i] = x
+        for i, y in enumerate(paths[1]):
+            p_share_info.contents.path_y[i] = y
         
-        crc16 = cast(addressof(p_dummy.contents)+6+size, POINTER(c_uint16))
+        p_share_info.contents.obstacle_num = socket.htons(len(obstacles))
+
+        for o, obj in enumerate(obstacles):
+            obstacle = cast(addressof(p_share_info.contents)+sizeof(SharingInformation)+(o*sizeof(ObstacleInformation)), POINTER(ObstacleInformation))
+            obstacle.contents.cls = obj[0]
+            obstacle.contents.enu_x = obj[1]
+            obstacle.contents.enu_y = obj[2]
+            obstacle.contents.heading = obj[3]
+            obstacle.contents.velocity = obj[4]
+        
+        crc16 = cast(addressof(p_dummy.contents)+size, POINTER(c_uint16))
         crc_data = bytearray(p_dummy.contents)
-        crc16.contents.value = socket.htons(calc_crc16(crc_data,size+6))
+        crc16.contents.value = socket.htons(calc_crc16(crc_data, size))
         
+        package_len = 8 + size
+        p_overall.contents.len_package = socket.htons(package_len)
+
         self.add_ext_status_data(p_overall, package_len)
 
-        self.hdr.contents.len = socket.ntohs(10+sizeof(TLVC_Overall)+socket.ntohs(p_overall.contents.len_package))
+        self.hdr.contents.len = socket.ntohs(sizeof(V2x_App_Hdr)+6+sizeof(TLVC_Overall)+socket.ntohs(p_overall.contents.len_package))
         self.hdr.contents.seq = 0
         self.hdr.contents.payload_id = socket.htons(0x10)
         self.tx_msg.contents.psid = socket.htonl(EM_V2V_MSG)
@@ -81,6 +113,8 @@ class SocketHandler:
         crc16.contents.value = socket.htons(_crc16)
         
         data = self.tx_buf[:send_len]
+        
+        self.print_datum(send_len, cnt, self.rx_cnt, state, paths, obstacles)
 
         return self.send(data)
 
@@ -89,16 +123,19 @@ class SocketHandler:
         if data == None:
             return -1
         if len(data) > SIZE_WSR_DATA:
+            self.rx_cnt += 1
             hdr_ofs = V2x_App_Hdr.data.offset
             rx_ofs = V2x_App_RxMsg.data.offset
             ovr_ofs = sizeof(TLVC_Overall)
-            tlvc_ofs = sizeof(V2x_App_Ext_TLVC)
-            tlvc = V2x_App_Ext_TLVC.from_buffer_copy(data, hdr_ofs+rx_ofs+ovr_ofs)
-            seq_len = socket.ntohs(tlvc.len)-2 # 2: crc
-            print(seq_len)
-            seq_ofs = hdr_ofs+rx_ofs+ovr_ofs+tlvc_ofs
-            sequence = data[seq_ofs:seq_ofs+seq_len]
-            self.print_hexa(sequence)
+            tlvc_ofs =  hdr_ofs+rx_ofs+ovr_ofs
+            tlvc = V2x_App_SI_TLVC.from_buffer_copy(data,tlvc_ofs)
+            sharing_information = tlvc.data
+            obstacles = []
+            for i in range(socket.ntohs(sharing_information.obstacle_num)):
+                ofs = tlvc_ofs+sizeof(V2x_App_SI_TLVC)+(i*sizeof(ObstacleInformation))
+                obstacle = ObstacleInformation.from_buffer_copy(data[ofs:ofs+sizeof(ObstacleInformation)])
+                obstacles.append(obstacle)
+            self.organize_data(len(data), sharing_information, obstacles)
         return 1
 
     def send(self, data):
@@ -139,13 +176,13 @@ class SocketHandler:
     
     def set_rx(self):
         self.rx_buf = (c_char * MAX_TX_PACKET_TO_OBU)()
+        self.rx_cnt = 0
         if self.rx_buf == None:
             print("[Socket Handler] Receive memory setting error")
             return -1
         else:  
             print("[Socket Handler] Rx Send Set")
             return 1
-        
 
     def get_p_overall(self, cnt):
         p_overall = cast(addressof(self.tx_msg.contents)+V2x_App_TxMsg.data.offset, POINTER(TLVC_Overall))
@@ -154,11 +191,24 @@ class SocketHandler:
         p_overall.contents.magic=b'EMOP'
         p_overall.contents.version = 1
         p_overall.contents.num_package = cnt
-        package_len = 12
-        p_overall.contents.len_package = socket.htons(package_len)
         crc_data = bytearray(p_overall.contents)
         p_overall.contents.crc = socket.htons(calc_crc16(crc_data, sizeof(TLVC_Overall)-2))
-        return p_overall, package_len
+        return p_overall
+
+    def organize_data(self, data_size, sharing_information, obstacles):
+
+        tx_cnt = socket.ntohl(sharing_information.tx_cnt)
+        rx_cnt = socket.ntohl(sharing_information.rx_cnt)
+        vehicle_state = [ sharing_information.state,
+                         sharing_information.latitude,sharing_information.longitude,
+                         sharing_information.heading, sharing_information.velocity ]
+        vehicle_path = [ list(sharing_information.path_x),list(sharing_information.path_y) ]
+        vehicle_obstacles = []
+        for obs in obstacles:
+            vehicle_obstacles.append([obs.cls, obs.enu_x, obs.enu_y, obs.heading, obs.velocity])
+        self.print_datum(data_size, tx_cnt, rx_cnt, vehicle_state, vehicle_path, vehicle_obstacles)
+
+
 
     def add_ext_status_data(self, p_overall, package_len):
         p_status = cast(addressof(p_overall.contents)+sizeof(TLVC_Overall)+package_len, POINTER(TLVC_STATUS_CommUnit))
@@ -200,3 +250,11 @@ class SocketHandler:
         for byte in data:  # buf의 각 바이트에 대해 반복
             print(f"{byte:02X} ", end="")  # 각 바이트를 16진수 형식으로 출력
         print()  # 줄바꿈
+    
+    def print_datum(self, data_size, tx_cnt, rx_cnt, vehicle_state, vehicle_path, vehicle_obstacles):
+        print(f"Print Data\ndata_size:{data_size} tx_cnt:{tx_cnt} rx_cnt:{rx_cnt}")
+        print(f"state:{vehicle_state[0]}\nlat:{vehicle_state[1]} lng:{vehicle_state[2]} h:{vehicle_state[3]} v:{vehicle_state[4]}")
+        print(f"path: x={vehicle_path[0][0]} y={vehicle_path[0][1]} ~ x={vehicle_path[-1][0]} y={vehicle_path[-1][1]}")
+        print(f"There are {len(vehicle_obstacles)} obstacles")
+        for i, obs in enumerate(vehicle_obstacles):
+            print(f"[{i}] cls:{obs[0]} enu_x:{obs[1]} enu_y:{obs[2]} h:{obs[3]} v:{obs[4]}")
