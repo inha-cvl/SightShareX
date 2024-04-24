@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import rospy
-from sightshare.msg import ShareInfo, Path, Object
-from geometry_msgs.msg import Pose
+from sightshare.msg import ShareInfo, Path, Obstacle
 
 import math
 
@@ -21,10 +20,10 @@ class PubTest:
         self.heading = math.radians(60)
         self.velocity = 30/3.6
         self.paths = [(-120.30591517930621,192.3993121295486),(-135.8316134018194,209.36844901511554), (-149.34914193021973,224.10873342219435),(-158.80599932215628,234.43188133205408),(-172.9832297564156,249.92400778689967), (-188.52320491162592,266.8801014076772),(-212.16209478387364,292.69096386917386), (-237.1665601072975,319.96322892745593)]
-        self.objects = []
+        self.obstacles = []
         for n in range(3):
-            obj = [1, n, -149.359, 224.128, math.radians(60), 25/3.6]
-            self.objects.append(obj)
+            obs = [1, n, -149.359, 224.128, math.radians(60), 25/3.6]
+            self.obstacles.append(obs)
         
     def get_share_info(self):
         share_info = ShareInfo()
@@ -42,15 +41,15 @@ class PubTest:
             path.kappa.data = 1
             share_info.paths.append(path)
             
-        for o in self.objects:
-            object = Object()
-            object.cls = o[0]
-            object.id = o[1]
-            object.pose.x = o[2]
-            object.pose.y = o[3]
-            object.pose.theta = o[4]
-            object.velocity.data = o[5]
-            share_info.objects.append(object)
+        for o in self.obstacles:
+            obstacle = Obstacle()
+            obstacle.cls = o[0]
+            obstacle.id = o[1]
+            obstacle.pose.x = o[2]
+            obstacle.pose.y = o[3]
+            obstacle.pose.theta = o[4]
+            obstacle.velocity.data = o[5]
+            share_info.obstacles.append(obstacle)
             
         return share_info
 
