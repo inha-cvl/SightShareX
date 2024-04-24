@@ -12,7 +12,7 @@ add_message_files(
   FILES
   ShareInfo.msg
   Path.msg
-  Object.msg
+  Obstacle.msg
 )
 
 generate_messages(
