@@ -22,14 +22,15 @@ class V2VSharing:
             return -1
         return 1
 
-    def execute(self, cnt, state, paths, obstacles):
-        if self.type == 1: #Sender
-            return self.socket_handler.tx(cnt,state, paths, obstacles)
-        elif self.type == 2:
-            return self.socket_handler.rx()
-        else:
-            if self.socket_handler.tx(cnt,state, paths, obstacles) < 0 or self.socket_handler.rx() < 0:
-                return -1
-            else:
-                return 1
 
+    def do_tx(self, state, paths, obstacles):
+        return self.socket_handler.tx(state, paths, obstacles)
+
+    def do_rx(self):
+        return self.socket_handler.rx()
+
+    def do_calc(self):
+        return self.socket_handler.calc_comm()
+
+    def do_calc_rate(self, Hz):
+        return self.socket_handler.calc_rate(Hz)

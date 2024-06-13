@@ -43,15 +43,14 @@ export default {
 }
 .main-content {
   flex: 1; /* 나머지 공간을 차지 */
-  padding: 2rem;
-  text-align: left;
+  text-align: center;
 }
 .map {
-  flex: 1;
+  flex: 1.5;
   height: 100%; /* 페이지 전체 높이를 유지 */
 }
 .vehicle-3d-view {
-  flex: 1.5;
+  flex: 2;
   height: 100%; /* 페이지 전체 높이를 유지 */
 }
 </style>

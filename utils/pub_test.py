@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import rospy
-from sightshare.msg import ShareInfo, Path, Obstacle
+from sightsharex.msg import ShareInfo, Path, Obstacle
 
 import math
 

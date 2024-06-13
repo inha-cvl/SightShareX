@@ -3,6 +3,8 @@ import socket
 from ctypes import *
 from datetime import datetime, timedelta
 import struct
+import math
+import time
 
 from .v2x_interface import *
 from .crc16 import calc_crc16
@@ -12,16 +14,25 @@ V2V_PSID = EM_V2V_MSG
 IP = '192.168.1.11'
 
 class SocketHandler:
-    def __init__(self, type):
-        self.type = type
+    def __init__(self, interface):
+        self.interface = interface
         self.interface_list = [b'', b'enp4s0', b'enx00e04c6a3d90']
-        pass
+        self.communication_performance = {
+            'state': 0,
+            'v2x': 0,
+            'rtt': 0,
+            'mbps': 0,
+            'packet_size': 0,
+            'packet_rate': 0,
+            'distance': 0
+        }
+        self.rtt_ts_list = []
 
     def connect(self):
         try:
             self.fd = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            if self.type > 0:
-                interface_name = self.interface_list[self.type]
+            if self.interface > 0:
+                interface_name = self.interface_list[self.interface]
                 try:
                     self.fd.setsockopt(socket.SOL_SOCKET, 25, interface_name)
                 except PermissionError:
@@ -52,17 +63,14 @@ class SocketHandler:
         crc16.contents.value = socket.htons(_crc16)
         data = buf[:SIZE_WSR_DATA]
 
-        return self.send(data)
+        self.tx_cnt = 0
+        self.tx_start_time = time.time()
+
+        return self.send(data, SIZE_WSR_DATA)
     
-    def tx(self, cnt, state, paths, obstacles):
-        p_overall = self.get_p_overall(cnt)
-        
-        # size = 4
-        # p_dummy = cast(addressof(p_overall.contents) + sizeof(TLVC_Overall), POINTER(V2x_App_Ext_TLVC))
-        # p_dummy.contents.type = socket.htonl(EM_PT_RAW_DATA)
-        # p_dummy.contents.len = socket.htons(size + 2)
-        # p_seq = cast(addressof(p_dummy.contents)+6, POINTER(c_uint32))
-        # p_seq.contents.value = socket.htonl(cnt+1) #sequence data input 
+    def tx(self, state, paths, obstacles):
+        p_overall = self.get_p_overall(self.tx_cnt)
+        self.set_tx_values(state)
 
         size = sizeof(V2x_App_SI_TLVC)+sizeof(ObstacleInformation)*len(obstacles)
         p_dummy = cast(addressof(p_overall.contents) + sizeof(TLVC_Overall), POINTER(V2x_App_SI_TLVC))
@@ -70,28 +78,31 @@ class SocketHandler:
         p_dummy.contents.len = socket.htons(size + 2)
 
         p_share_info = cast(addressof(p_dummy.contents.data), POINTER(SharingInformation))
-        p_share_info.contents.tx_cnt = socket.htonl(cnt)
-        p_share_info.contents.rx_cnt = socket.htonl(self.rx_cnt+8)
+        p_share_info.contents.tx_cnt = socket.htonl(self.tx_cnt)
+        p_share_info.contents.tx_cnt_from_rx = socket.htonl(self.tx_cnt_from_rx)
         p_share_info.contents.state = state[0]
-        p_share_info.contents.latitude = state[1]
-        p_share_info.contents.longitude = state[2]
-        p_share_info.contents.heading = state[3]
-        p_share_info.contents.velocity = state[4]
+        p_share_info.contents.signal = state[1]
+        p_share_info.contents.latitude = state[2]
+        p_share_info.contents.longitude = state[3]
+        p_share_info.contents.heading = state[4]
+        p_share_info.contents.velocity = state[5]
 
-        for i, x in enumerate(paths[0]):
-            p_share_info.contents.path_x[i] = x
-        for i, y in enumerate(paths[1]):
-            p_share_info.contents.path_y[i] = y
+        if len(paths) > 0:
+            for i, x in enumerate(paths[0]):
+                p_share_info.contents.path_x[i] = x
+            for i, y in enumerate(paths[1]):
+                p_share_info.contents.path_y[i] = y
         
         p_share_info.contents.obstacle_num = socket.htons(len(obstacles))
 
-        for o, obj in enumerate(obstacles):
-            obstacle = cast(addressof(p_share_info.contents)+sizeof(SharingInformation)+(o*sizeof(ObstacleInformation)), POINTER(ObstacleInformation))
-            obstacle.contents.cls = obj[0]
-            obstacle.contents.enu_x = obj[1]
-            obstacle.contents.enu_y = obj[2]
-            obstacle.contents.heading = obj[3]
-            obstacle.contents.velocity = obj[4]
+        if len(obstacles) > 0:
+            for o, obj in enumerate(obstacles):
+                obstacle = cast(addressof(p_share_info.contents)+sizeof(SharingInformation)+(o*sizeof(ObstacleInformation)), POINTER(ObstacleInformation))
+                obstacle.contents.cls = obj[0]
+                obstacle.contents.enu_x = obj[1]
+                obstacle.contents.enu_y = obj[2]
+                obstacle.contents.heading = obj[3]
+                obstacle.contents.velocity = obj[4]
         
         crc16 = cast(addressof(p_dummy.contents)+size, POINTER(c_uint16))
         crc_data = bytearray(p_dummy.contents)
@@ -114,9 +125,11 @@ class SocketHandler:
         
         data = self.tx_buf[:send_len]
         
-        self.print_datum(send_len, cnt, self.rx_cnt, state, paths, obstacles)
+        self.communication_performance['packet_size'] = send_len
 
-        return self.send(data)
+        self.print_datum(send_len, self.tx_cnt, self.rx_cnt, state, paths, obstacles)
+    
+        return self.send(data, send_len)
 
     def rx(self):
         data = self.receive()
@@ -124,28 +137,86 @@ class SocketHandler:
             return -1
         if len(data) > SIZE_WSR_DATA:
             self.rx_cnt += 1
+            self.rx_rate += 1
             hdr_ofs = V2x_App_Hdr.data.offset
             rx_ofs = V2x_App_RxMsg.data.offset
             ovr_ofs = sizeof(TLVC_Overall)
             tlvc_ofs =  hdr_ofs+rx_ofs+ovr_ofs
             tlvc = V2x_App_SI_TLVC.from_buffer_copy(data,tlvc_ofs)
             sharing_information = tlvc.data
+            self.set_rx_values(sharing_information)
+            self.tx_cnt_from_rx = sharing_information.tx_cnt
+            self.calc_rtt(sharing_information.tx_cnt_from_rx)
             obstacles = []
             for i in range(socket.ntohs(sharing_information.obstacle_num)):
                 ofs = tlvc_ofs+sizeof(V2x_App_SI_TLVC)+(i*sizeof(ObstacleInformation))
                 obstacle = ObstacleInformation.from_buffer_copy(data[ofs:ofs+sizeof(ObstacleInformation)])
                 obstacles.append(obstacle)
-            self.organize_data(len(data), sharing_information, obstacles)
-        return 1
+            state, path, obstacles = self.organize_data(len(data), sharing_information, obstacles)
+            return [state, path, obstacles]
+        else:
+            return [0, 0, 0]
 
-    def send(self, data):
+    def set_tx_values(self, state):
+        self.tx_latitude = state[2]
+        self.tx_longitude = state[3]
+    
+    def set_rx_values(self, sharing_information):
+        self.rx_latitude = sharing_information.latitude
+        self.rx_longtude = sharing_information.longitude
+
+    def calc_rtt(self, tx_cnt_from_rx):
+        rtt = 0
+        for ts in self.rtt_ts_list:
+            if ts[0] == tx_cnt_from_rx:
+                rtt = round((time.time()-ts[1])*1000)
+                self.communication_performance['rtt'] = rtt
+                break
+        self.rtt_ts_list[:] = [ts for ts in self.rtt_ts_list if ts[0] >= tx_cnt_from_rx]
+
+    def calc_comm(self):
+        if self.tx_cnt < 1 or self.rx_cnt < 1:
+            return -1
+        else:
+            earthRadius = 6371000.0
+            lat1 = math.radians(self.tx_latitude)
+            long1 = math.radians(self.tx_longitude)
+            lat2 = math.radians(self.rx_latitude)
+            long2 = math.radians(self.rx_longtude)
+
+            dLat = lat2-lat1
+            dLong = long2-long1
+            a = math.sin(dLat / 2) * math.sin(dLat / 2) + math.cos(lat1) * math.cos(lat2) * math.sin(dLong / 2) * math.sin(dLong / 2)
+            c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+            distance = earthRadius * c
+            self.communication_performance['distance'] = distance   
+            return self.communication_performance        
+
+    def calc_rate(self, hz):
+        if self.rx_rate == 0:
+            return -1
+        else:
+            rx_rate = (float(self.rx_rate)/hz)*100
+            self.communication_performance['packet_rate'] = rx_rate
+            return 1
+
+
+    def send(self, data, send_size):
         try:
             self.fd.sendall(data)
             print("[Socket Handler] Packet Sent")
+            self.rtt_ts_list.append([self.tx_cnt, time.time()])
+            self.tx_cnt += 1
+            current_time = time.time()
+            tx_time = self.tx_start_time - current_time
+            mbps = (send_size/tx_time)/1000000
+            self.communication_performance['mbps'] = mbps 
+            self.tx_start_time = current_time
             return 1
         except socket.error as e:
             print(f"[Socket Handler] {e}")
             return -1
+    
     
     def receive(self):
         try:
@@ -177,6 +248,11 @@ class SocketHandler:
     def set_rx(self):
         self.rx_buf = (c_char * MAX_TX_PACKET_TO_OBU)()
         self.rx_cnt = 0
+        self.tx_cnt_from_rx = 0
+        self.rx_rate = 0
+        self.rx_latitude = 0
+        self.rx_longtude = 0
+        
         if self.rx_buf == None:
             print("[Socket Handler] Receive memory setting error")
             return -1
@@ -198,16 +274,16 @@ class SocketHandler:
     def organize_data(self, data_size, sharing_information, obstacles):
 
         tx_cnt = socket.ntohl(sharing_information.tx_cnt)
-        rx_cnt = socket.ntohl(sharing_information.rx_cnt)
-        vehicle_state = [ sharing_information.state,
+        tx_cnt_from_rx = socket.ntohl(sharing_information.tx_cnt_from_rx)
+        vehicle_state = [ sharing_information.state, sharing_information.signal,
                          sharing_information.latitude,sharing_information.longitude,
                          sharing_information.heading, sharing_information.velocity ]
         vehicle_path = [ list(sharing_information.path_x),list(sharing_information.path_y) ]
         vehicle_obstacles = []
         for obs in obstacles:
             vehicle_obstacles.append([obs.cls, obs.enu_x, obs.enu_y, obs.heading, obs.velocity])
-        self.print_datum(data_size, tx_cnt, rx_cnt, vehicle_state, vehicle_path, vehicle_obstacles)
-
+        self.print_datum(data_size, tx_cnt, tx_cnt_from_rx, vehicle_state, vehicle_path, vehicle_obstacles)
+        return vehicle_state, vehicle_path, vehicle_obstacles
 
 
     def add_ext_status_data(self, p_overall, package_len):
@@ -254,7 +330,9 @@ class SocketHandler:
     def print_datum(self, data_size, tx_cnt, rx_cnt, vehicle_state, vehicle_path, vehicle_obstacles):
         print(f"Print Data\ndata_size:{data_size} tx_cnt:{tx_cnt} rx_cnt:{rx_cnt}")
         print(f"state:{vehicle_state[0]}\nlat:{vehicle_state[1]} lng:{vehicle_state[2]} h:{vehicle_state[3]} v:{vehicle_state[4]}")
-        print(f"path: x={vehicle_path[0][0]} y={vehicle_path[0][1]} ~ x={vehicle_path[-1][0]} y={vehicle_path[-1][1]}")
+        if len(vehicle_path) > 0:
+            print(f"path: x={vehicle_path[0][0]} y={vehicle_path[0][1]} ~ x={vehicle_path[-1][0]} y={vehicle_path[-1][1]}")
         print(f"There are {len(vehicle_obstacles)} obstacles")
-        for i, obs in enumerate(vehicle_obstacles):
-            print(f"[{i}] cls:{obs[0]} enu_x:{obs[1]} enu_y:{obs[2]} h:{obs[3]} v:{obs[4]}")
+        if len(vehicle_obstacles) > 0:
+            for i, obs in enumerate(vehicle_obstacles):
+                print(f"[{i}] cls:{obs[0]} enu_x:{obs[1]} enu_y:{obs[2]} h:{obs[3]} v:{obs[4]}")

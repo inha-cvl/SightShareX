@@ -1,17 +1,40 @@
 #!/usr/bin/env python
 import rospy
-from sightshare.msg import ShareInfo
+import threading
+import signal
+
+from sightsharex.msg import *
+from std_msgs.msg import Float32MultiArray
+
+def signal_handler(sig, frame):
+    rospy.signal_shutdown("SIGINT received")
 
 class RosManager:
     def __init__(self, v2v_sharing, type):
-        rospy.init_node(f"v2v_sharing_{type}")
+        self.type = type
+        rospy.init_node(f"{type}_v2v_sharing")
         self.v2v_sharing = v2v_sharing
+        self.set_values()
+        self.set_protocol()
+    
+    def set_values(self):
+        self.Hz = 5
+        self.rate = rospy.Rate(self.Hz)
+        self.info_received = False
+        self.shutdown_event = threading.Event()
+
+        self.vehicle_state = [0,0,0,0,0,0]
+        self.vehicle_path = []
+        self.vehicle_obstacles = []
+
 
     def set_protocol(self):
-        rospy.Subscriber('/utils/test_share_info', ShareInfo, self.share_info_cb )
+        rospy.Subscriber(f'/{self.type}/EgoShareInfo', ShareInfo, self.share_info_cb)
+        self.pub_target_info = rospy.Publisher(f'{self.type}/TargetShareInfo', ShareInfo, queue_size=1)
+        self.pub_communication_performance = rospy.Publisher(f'{self.type}/CommunicationPerformance', Float32MultiArray, queue_size=1)
 
     def share_info_cb(self, msg):
-        self.vehicle_state = [ msg.state, msg.pose.x, msg.pose.y, msg.pose.theta, msg.velocity.data ]
+        self.vehicle_state = [ msg.state.data, msg.signal.data, msg.pose.x, msg.pose.y, msg.pose.theta, msg.velocity.data ]
         if len(self.vehicle_state) > 0:
             self.info_received = True
         paths = [[],[]]
@@ -23,27 +46,115 @@ class RosManager:
         for o in msg.obstacles:
             obstacles.append((o.cls, o.pose.x, o.pose.y, o.pose.theta, o.velocity.data))
         self.vehicle_obstacles = obstacles
+    
+    def publish_calc(self, system):
+        self.pub_communication_performance.publish(Float32MultiArray(data=list(system.values())))
+
+    def publish(self, result):
+        if result == [0,0,0]:
+            rospy.logwarn("No Target Share Info to Publish")
+            return
+        vehicle_state = result[0]
+        vehicle_path = result[1]
+        vehicle_obstalce = result[2]
+
+        share_info = ShareInfo()
+        share_info.state.data = vehicle_state[0]
+        share_info.signal.data = vehicle_state[1]
+        share_info.pose.x = vehicle_state[2]
+        share_info.pose.y = vehicle_state[3]
+        share_info.pose.theta = vehicle_state[4]
+        share_info.velocity.data = vehicle_state[5]
+        
+        if len(vehicle_path[0]) > 0:
+            for i, xs in enumerate(vehicle_path[0]):
+                path = Path()
+                path.pose.x = xs
+                path.pose.y = vehicle_path[1][i]
+                share_info.paths.append(path)
+        
+        if len(vehicle_obstalce) > 0:
+            for obs in vehicle_obstalce:
+                obstacle = Obstacle()
+                obstacle.cls = obs[0]
+                obstacle.id = obs[1]
+                obstacle.pose.x = obs[2]
+                obstacle.pose.y = obs[3]
+                obstacle.pose.theta = obs[4]
+                obstacle.pose.velocity.data = obs[5]
+                share_info.obstacles.append(obstacle)
+            
+        self.pub_target_info.publish(share_info)
+
+
+    def do_tx(self):
+        while not rospy.is_shutdown() and not self.shutdown_event.is_set():
+            tx_res = self.v2v_sharing.do_tx(self.vehicle_state, self.vehicle_path, self.vehicle_obstacles)
+            if tx_res<0:
+                return -1
+            self.rate.sleep()
+    
+    def do_rx(self):
+        while not rospy.is_shutdown() and not self.shutdown_event.is_set():
+            rx_res = self.v2v_sharing.do_rx()
+            if rx_res == None:
+                return -1
+            else:
+                self.publish(rx_res)
+            self.rate.sleep()
+    
+    def do_calc_rate(self):
+        rate = rospy.Rate(1)
+        while not rospy.is_shutdown() and not self.shutdown_event.is_set():
+            calc_rates_res = self.v2v_sharing.do_calc_rate(self.Hz)
+            if calc_rates_res < 0:
+                return -1
+            rate.sleep()
+
+    def do_calc(self):
+        while not rospy.is_shutdown() and not self.shutdown_event.is_set():
+            calc_res = self.v2v_sharing.do_calc()
+            if calc_res == -1:
+                pass
+            else:
+                self.publish_calc(calc_res)
+            self.rate.sleep()
+            
 
     def execute(self):
-        print("[RosManager] V2V Sharing Start")
-        self.info_received = False
-        self.set_protocol()
-
-        self.vehicle_state = [1, -119.6296576810071, 191.66264680803388, 1.0471975511965976, 8.333333015441895]
-        self.vehicle_path = [[-120.30591517930621, -135.8316134018194,-149.34914193021973,-158.80599932215628,-172.9832297564156,-188.52320491162592,-212.16209478387364,-237.1665601072975], [192.3993121295486,209.36844901511554,224.10873342219435, 234.43188133205408, 249.92400778689967, 266.8801014076772, 292.69096386917386, 319.96322892745593 ]]
-        self.vehicle_obstacles = [(1, -149.359, 224.128, 1.0471975511965976,6.94444465637207), (5, -149.359, 224.128, 1.0471975511965976,6.94444465637207), (2, -149.359, 224.128, 1.0471975511965976,6.94444465637207)]
-
+        signal.signal(signal.SIGINT, signal_handler)
+        rospy.loginfo("RosManager V2V Sharing Start")
+        
         if self.v2v_sharing.set_obu() < 0 :
             return -1
         
-        rate = rospy.Rate(1)
         sharing_state = 1
-        cnt = 0
-        while not rospy.is_shutdown():
-            #if self.info_received:
-            if self.v2v_sharing.execute(cnt, self.vehicle_state, self.vehicle_path, self.vehicle_obstacles) < 0 :
-                sharing_state = -1
-                break
-            cnt += 1
-            rate.sleep()
+
+        thread1 = threading.Thread(target=self.do_tx)
+        thread2 = threading.Thread(target=self.do_rx)
+        thread3 = threading.Thread(target=self.do_calc)
+        thread4 = threading.Thread(target=self.do_calc_rate)
+
+        thread1.start()
+        thread2.start()
+        thread3.start()
+        thread4.start()
+
+        try:
+            thread1.join()
+            thread2.join()
+            thread3.join()
+            thread4.join()
+        
+        except KeyboardInterrupt:
+            self.shutdown_event.set()
+            thread1.join()
+            thread2.join()
+            thread3.join()
+            thread4.join()
+        
+        rospy.loginfo("ROSManager has shut down gracefully.")
         return sharing_state
+        
+        
+
