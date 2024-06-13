@@ -193,9 +193,10 @@ class SocketHandler:
             return self.communication_performance        
 
     def calc_rate(self, hz):
-        if self.rx_rate == 0:
+        if self.rx_rate == 0 or self.rx_rate == self.prev_rx_rate:
             return -1
         else:
+            self.prev_rx_rate = self.rx_rate
             rx_rate = (float(self.rx_rate)/hz)*100
             self.communication_performance['packet_rate'] = rx_rate
             return 1
@@ -250,6 +251,7 @@ class SocketHandler:
         self.rx_cnt = 0
         self.tx_cnt_from_rx = 0
         self.rx_rate = 0
+        self.prev_rx_rate = 0
         self.rx_latitude = 0
         self.rx_longtude = 0
         

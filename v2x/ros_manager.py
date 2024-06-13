@@ -91,6 +91,7 @@ class RosManager:
         while not rospy.is_shutdown() and not self.shutdown_event.is_set():
             tx_res = self.v2v_sharing.do_tx(self.vehicle_state, self.vehicle_path, self.vehicle_obstacles)
             if tx_res<0:
+                rospy.logerr("[V2X ROSManager] Tx Send Data Failed")
                 return -1
             self.rate.sleep()
     
@@ -98,6 +99,7 @@ class RosManager:
         while not rospy.is_shutdown() and not self.shutdown_event.is_set():
             rx_res = self.v2v_sharing.do_rx()
             if rx_res == None:
+                rospy.logerr("[V2X ROSManager] No Rx Data from Target")
                 return -1
             else:
                 self.publish(rx_res)
@@ -108,6 +110,7 @@ class RosManager:
         while not rospy.is_shutdown() and not self.shutdown_event.is_set():
             calc_rates_res = self.v2v_sharing.do_calc_rate(self.Hz)
             if calc_rates_res < 0:
+                rospy.logerr("[V2X ROSManager] Rx Not Working")
                 return -1
             rate.sleep()
 
