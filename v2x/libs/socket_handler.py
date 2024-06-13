@@ -94,15 +94,15 @@ class SocketHandler:
                 p_share_info.contents.path_y[i] = y
         
         p_share_info.contents.obstacle_num = socket.htons(len(obstacles))
-
         if len(obstacles) > 0:
             for o, obj in enumerate(obstacles):
+                print("obj", obj)
                 obstacle = cast(addressof(p_share_info.contents)+sizeof(SharingInformation)+(o*sizeof(ObstacleInformation)), POINTER(ObstacleInformation))
-                obstacle.contents.cls = obj[0]
-                obstacle.contents.enu_x = obj[1]
-                obstacle.contents.enu_y = obj[2]
-                obstacle.contents.heading = obj[3]
-                obstacle.contents.velocity = obj[4]
+                obstacle.contents.cls = int(obj[0])
+                obstacle.contents.enu_x = float(obj[1])
+                obstacle.contents.enu_y = float(obj[2])
+                obstacle.contents.heading = float(obj[3])
+                obstacle.contents.velocity = float(obj[4])
         
         crc16 = cast(addressof(p_dummy.contents)+size, POINTER(c_uint16))
         crc_data = bytearray(p_dummy.contents)
@@ -331,10 +331,10 @@ class SocketHandler:
     
     def print_datum(self, data_size, tx_cnt, rx_cnt, vehicle_state, vehicle_path, vehicle_obstacles):
         print(f"Print Data\ndata_size:{data_size} tx_cnt:{tx_cnt} rx_cnt:{rx_cnt}")
-        print(f"state:{vehicle_state[0]}\nlat:{vehicle_state[1]} lng:{vehicle_state[2]} h:{vehicle_state[3]} v:{vehicle_state[4]}")
-        if len(vehicle_path) > 0:
-            print(f"path: x={vehicle_path[0][0]} y={vehicle_path[0][1]} ~ x={vehicle_path[-1][0]} y={vehicle_path[-1][1]}")
-        print(f"There are {len(vehicle_obstacles)} obstacles")
-        if len(vehicle_obstacles) > 0:
-            for i, obs in enumerate(vehicle_obstacles):
-                print(f"[{i}] cls:{obs[0]} enu_x:{obs[1]} enu_y:{obs[2]} h:{obs[3]} v:{obs[4]}")
+        #print(f"state:{vehicle_state[0]}\nlat:{vehicle_state[2]} lng:{vehicle_state[3]} h:{vehicle_state[4]} v:{vehicle_state[5]}")
+        # if vehicle_path != []:
+        #     print(f"path: x={vehicle_path[0][0]} y={vehicle_path[0][1]} ~ x={vehicle_path[-1][0]} y={vehicle_path[-1][1]}")
+        # print(f"There are {len(vehicle_obstacles)} obstacles")
+        # if len(vehicle_obstacles) > 0:
+        #     for i, obs in enumerate(vehicle_obstacles):
+        #         print(f"[{i}] cls:{obs[0]} enu_x:{obs[1]} enu_y:{obs[2]} h:{obs[3]} v:{obs[4]}")

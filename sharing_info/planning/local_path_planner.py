@@ -38,7 +38,6 @@ class LocalPathPlanner:
     def need_update(self):
         if self.local_path == None:
             return 0, -1
-
         idx = phelper.find_nearest_idx(self.local_path, self.local_pose)
         if self.temp_signal != self.current_signal and self.current_signal != 0:
             self.temp_signal = self.current_signal
@@ -107,8 +106,9 @@ class LocalPathPlanner:
         return local_kappa
 
     def execute(self):
-        if self.local_pose == None:
+        if self.local_pose == None or self.local_pose[0] == 'inf':
             return None
+        print(self.local_pose)
         local_path = []
         need_update, idx = self.need_update()
         if need_update != -1:

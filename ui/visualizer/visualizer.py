@@ -59,7 +59,8 @@ class Visualizer:
         viz_path = path_viz(path, "ego")
         obses = []
         for obs in msg.obstacles:
-            obses.append([obs.position.x, obs.position.y, obs.heading.data])
+            print(obs)
+            obses.append([obs.pose.x, obs.pose.y, obs.pose.theta])
         viz_obstacles = ObstaclesViz(obses)
         self.pub_ego_obstacles_viz.publish(viz_obstacles)
         self.pub_ego_path_viz.publish(viz_path)
@@ -83,7 +84,8 @@ class Visualizer:
         viz_path = path_viz(path, "target")
         obses = []
         for obs in msg.obstacles:
-            obses.append([obs.position.x, obs.position.y, obs.heading.data])
+            
+            obses.append([obs.pose.x, obs.pose.y, obs.pose.theta])
         viz_obstacles = ObstaclesViz(obses)
         self.pub_ego_obstacles_viz.publish(viz_obstacles)
         self.pub_target_path_viz.publish(viz_path)

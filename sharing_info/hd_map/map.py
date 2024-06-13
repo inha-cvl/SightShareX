@@ -26,3 +26,4 @@ class MAP:
         lmap_viz = LaneletMapViz(self.lanelets, self.lmap.for_viz)
         mlmap_viz = MicroLaneletGraphViz(self.lanelets, self.graph)
         return lmap_viz, mlmap_viz
+    

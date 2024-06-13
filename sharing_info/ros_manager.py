@@ -50,10 +50,13 @@ class ROSManager:
         else:
             self.pub_ego_share_info = rospy.Publisher(f'/{self.type}/EgoShareInfo', ShareInfo, queue_size=1)
         self.pub_lmap_viz = rospy.Publisher('/lmap_viz', MarkerArray, queue_size=10)
-    
+
+        lmap, _ = self.map.get_vizs()
+        self.pub_lmap_viz.publish(lmap)
+
     def novatel_inspva_cb(self, msg):
         self.car_pose_status = 'Ok'
-        e,n,u =  self.geo2enu_transformer.transform(msg.latitude, msg.longitude, 5)
+        e,n,u =  self.geo2enu_transformer.transform(msg.longitude, msg.latitude, 5)
         self.car_pose.x = e
         self.car_pose.y = n
         self.car_pose.theta = 89-msg.azimuth
@@ -83,7 +86,7 @@ class ROSManager:
 
     def organize_share_info(self):
         share_info = ShareInfo()
-        if self.car_pose_status == 'No' or self.local_path == None:
+        if self.car_pose_status == 'No':
             return share_info
         
         share_info.state.data = 1
@@ -92,14 +95,16 @@ class ROSManager:
         share_info.pose.y = self.car_pose.y
         share_info.pose.theta = self.car_pose.theta
         share_info.velocity.data = self.car_velocity
+
+        if self.local_path != None:
+            for i, xy in enumerate(self.local_path):
+                path = Path()
+                path.pose.x = xy[0]
+                path.pose.y = xy[1]
+                path.kappa.data = self.local_kappa[i]
+                share_info.paths.append(path)
         
-        for i, xy in enumerate(self.local_path):
-            path = Path()
-            path.pose.x = xy[0]
-            path.pose.y = xy[1]
-            path.kappa.data = self.local_kappa[i]
-            share_info.paths.append(path)
-        
+
         for o in self.lidar_obstacles:
             obstacle = Obstacle()
             obstacle.cls.data = 0
@@ -124,14 +129,11 @@ class ROSManager:
     def do_path_planning(self):
         rate = rospy.Rate(10)
         while not rospy.is_shutdown() and not self.shutdown_event.is_set():
-            self.local_path, self.local_kappa = self.lpp.execute()
+            #self.local_path, self.local_kappa = self.lpp.execute()
             rate.sleep()
     
     def do_publish(self):
         rate = rospy.Rate(20)
-        lmap, _ = self.map.get_vizs()
-        self.pub_lmap_viz.publish(lmap)
-
         while not rospy.is_shutdown() and not self.shutdown_event.is_set():
             share_info = self.organize_share_info()
             self.pub_ego_share_info.publish(share_info)
