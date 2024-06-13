@@ -19,14 +19,14 @@ def main():
     map = MAP(map_name)
     local_path_planner  = LocalPathPlanner(map)
 
-    if type == 'ioniq5':
-        car = IONIQ5()
-    elif type == 'i30':
-        car = I30()
-    else:
-        car = Simulator(map_name)
+    # if type == 'ioniq5':
+    #     car = IONIQ5()
+    # elif type == 'i30':
+    #     car = I30()
+    # else:
+    #     car = Simulator(map_name)
 
-    ros_manager = ROSManager(type, map, car, local_path_planner)
+    ros_manager = ROSManager(type, map, local_path_planner)
     ros_manager.execute()
 
 if __name__=="__main__":

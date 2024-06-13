@@ -6,6 +6,7 @@ from pyproj import Proj, Transformer
 
 from sightsharex.msg import *
 from novatel_oem7_msgs.msg import INSPVA
+from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Pose2D
 from jsk_recognition_msgs.msg import BoundingBoxArray
 from visualization_msgs.msg import MarkerArray
@@ -14,11 +15,10 @@ def signal_handler(sig, frame):
     rospy.signal_shutdown("SIGINT received")
     
 class ROSManager:
-    def __init__(self, type, map, car, local_path_planning):
+    def __init__(self, type, map, local_path_planning):
         rospy.init_node(f'{type}_share_info')
         self.type = type
         self.map = map
-        self.car = car
         self.lpp = local_path_planning
 
         self.shutdown_event = threading.Event()
@@ -40,7 +40,8 @@ class ROSManager:
         self.enu2geo_transformter = Transformer.from_proj(proj_enu, proj_wgs84)
 
     def set_protocol(self):
-        rospy.Subscriber('/novatel/oem7/inspva', INSPVA, self.novatel_cb)
+        rospy.Subscriber('/novatel/oem7/inspva', INSPVA, self.novatel_inspva_cb)
+        rospy.Subscriber('/novatel/oem7/odom', Odometry, self.novatel_odom_cb )
         rospy.Subscriber('/mobinha/perception/lidar/track_box', BoundingBoxArray, self.lidar_cluster_cb)
         if self.type == 'sim_hlv':
             self.pub_ego_share_info = rospy.Publisher('/hlv/EgoShareInfo', ShareInfo, queue_size=1)
@@ -50,12 +51,15 @@ class ROSManager:
             self.pub_ego_share_info = rospy.Publisher(f'/{self.type}/EgoShareInfo', ShareInfo, queue_size=1)
         self.pub_lmap_viz = rospy.Publisher('/lmap_viz', MarkerArray, queue_size=10)
     
-    def novatel_cb(self, msg):
+    def novatel_inspva_cb(self, msg):
         self.car_pose_status = 'Ok'
-        [e, n] =  self.geo2enu_transformer.transform(msg.latitude, msg.longitude, 5)
+        e,n,u =  self.geo2enu_transformer.transform(msg.latitude, msg.longitude, 5)
         self.car_pose.x = e
         self.car_pose.y = n
         self.car_pose.theta = 89-msg.azimuth
+    
+    def novatel_odom_cb(self, msg):
+        self.car_velocity = msg.twist.twist.linear.x
 
     def lidar_cluster_cb(self, msg):
         obstacles = []
@@ -113,7 +117,7 @@ class ROSManager:
         while not rospy.is_shutdown() and not self.shutdown_event.is_set() :
             if self.type == 'sim' or self.type == 'sim_ioniq5' or self.type == 'sim_i30':
                 self.set_sim_pose(self.car.x, self.car.y, self.car.yaw)
-            self.car_velocity = self.car.current_velocity
+            #self.car_velocity = self.car.current_velocity
             self.lpp.update_value([self.car_pose.x, self.car_pose.y], self.car_velocity, self.user_signal)
             rate.sleep()
         
@@ -137,18 +141,18 @@ class ROSManager:
         signal.signal(signal.SIGINT, signal_handler)
         rospy.loginfo("ROSManger starting ... ")
 
-        thread1 = threading.Thread(target=self.car.execute)
+        #thread1 = threading.Thread(target=self.car.execute)
         thread2 = threading.Thread(target=self.update_value)
         thread3 = threading.Thread(target=self.do_path_planning)
         thread4 = threading.Thread(target=self.do_publish)
 
-        thread1.start()
+        #thread1.start()
         thread2.start()
         thread3.start()
         thread4.start()
 
         try:
-            thread1.join()
+            #thread1.join()
             thread2.join()
             thread3.join()
             thread4.join()
