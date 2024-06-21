@@ -108,7 +108,6 @@ class LocalPathPlanner:
     def execute(self):
         if self.local_pose == None or self.local_pose[0] == 'inf':
             return None
-        print(self.local_pose)
         local_path = []
         need_update, idx = self.need_update()
         if need_update != -1:

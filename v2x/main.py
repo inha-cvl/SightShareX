@@ -7,7 +7,7 @@ def main():
         type = 'sim'
         interface = 0
     else:
-        type = str(sys.argv[1]) # ioniq5, i30
+        type = str(sys.argv[1]) # ego, target
         interface = int(sys.argv[2]) #0: local, 1: ethernet, 2: usb ethernet
     
     v2v_sharing = V2VSharing(interface)

@@ -15,11 +15,13 @@ def signal_handler(sig, frame):
     rospy.signal_shutdown("SIGINT received")
     
 class ROSManager:
-    def __init__(self, type, map, local_path_planning):
+    def __init__(self, type, map, local_path_planning, simulator=None):
         rospy.init_node(f'{type}_share_info')
         self.type = type
         self.map = map
         self.lpp = local_path_planning
+
+        self.simulator = simulator
 
         self.shutdown_event = threading.Event()
         self.set_values()
@@ -41,14 +43,9 @@ class ROSManager:
 
     def set_protocol(self):
         rospy.Subscriber('/novatel/oem7/inspva', INSPVA, self.novatel_inspva_cb)
-        rospy.Subscriber('/novatel/oem7/odom', Odometry, self.novatel_odom_cb )
+        rospy.Subscriber('/novatel/oem7/odom', Odometry, self.novatel_odom_cb)
         rospy.Subscriber('/mobinha/perception/lidar/track_box', BoundingBoxArray, self.lidar_cluster_cb)
-        if self.type == 'sim_hlv':
-            self.pub_ego_share_info = rospy.Publisher('/hlv/EgoShareInfo', ShareInfo, queue_size=1)
-        elif self.type == 'sim_tlv':
-            self.pub_ego_share_info = rospy.Publisher('/tlv/EgoShareInfo', ShareInfo, queue_size=1)
-        else:
-            self.pub_ego_share_info = rospy.Publisher(f'/{self.type}/EgoShareInfo', ShareInfo, queue_size=1)
+        self.pub_ego_share_info = rospy.Publisher(f'/{self.type}/EgoShareInfo', ShareInfo, queue_size=1)
         self.pub_lmap_viz = rospy.Publisher('/lmap_viz', MarkerArray, queue_size=10)
 
         lmap, _ = self.map.get_vizs()
@@ -78,11 +75,13 @@ class ROSManager:
         la, ln, al = self.enu2geo_transformter.transform(x, y, 5)
         return [la, ln]
 
-    def set_sim_pose(self, e, n, theta):
+    def set_sim_pose(self):
         self.car_pose_status = 'Ok'
-        self.car_pose.x = e
-        self.car_pose.y = n
-        self.car_pose.theta = theta
+        self.car_pose.x = self.simulator.x
+        self.car_pose.y = self.simulator.y
+        self.car_pose.theta = self.simulator.yaw
+        self.car_velocity = self.simulator.v
+        self.lidar_obstacles = self.simulator.obstacles
 
     def organize_share_info(self):
         share_info = ShareInfo()
@@ -120,16 +119,15 @@ class ROSManager:
     def update_value(self):
         rate = rospy.Rate(20)
         while not rospy.is_shutdown() and not self.shutdown_event.is_set() :
-            if self.type == 'sim' or self.type == 'sim_ioniq5' or self.type == 'sim_i30':
-                self.set_sim_pose(self.car.x, self.car.y, self.car.yaw)
-            #self.car_velocity = self.car.current_velocity
+            if self.type == 'sim':
+                self.set_sim_pose()
             self.lpp.update_value([self.car_pose.x, self.car_pose.y], self.car_velocity, self.user_signal)
             rate.sleep()
         
     def do_path_planning(self):
         rate = rospy.Rate(10)
         while not rospy.is_shutdown() and not self.shutdown_event.is_set():
-            #self.local_path, self.local_kappa = self.lpp.execute()
+            self.local_path, self.local_kappa = self.lpp.execute()
             rate.sleep()
     
     def do_publish(self):
@@ -143,18 +141,22 @@ class ROSManager:
         signal.signal(signal.SIGINT, signal_handler)
         rospy.loginfo("ROSManger starting ... ")
 
-        #thread1 = threading.Thread(target=self.car.execute)
+        if self.type == 'sim':
+            thread1 = threading.Thread(target=self.simulator.execute, args=(self.shutdown_event.is_set(),))
+
         thread2 = threading.Thread(target=self.update_value)
         thread3 = threading.Thread(target=self.do_path_planning)
         thread4 = threading.Thread(target=self.do_publish)
 
-        #thread1.start()
+        if self.type == 'sim':
+            thread1.start()
         thread2.start()
         thread3.start()
         thread4.start()
 
         try:
-            #thread1.join()
+            if self.type == 'sim':
+                thread1.join()
             thread2.join()
             thread3.join()
             thread4.join()

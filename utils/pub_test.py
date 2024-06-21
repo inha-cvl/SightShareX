@@ -16,6 +16,7 @@ class PubTest:
 
     def set_datum(self):
         self.state = 0
+        self.signal = 0
         self.position = [-119.6296576810071, 191.66264680803388]
         self.heading = math.radians(60)
         self.velocity = 30/3.6
@@ -28,6 +29,7 @@ class PubTest:
     def get_share_info(self):
         share_info = ShareInfo()
         share_info.state = self.state
+        share_info.signal = self.signal
         share_info.pose.x = self.position[0]
         share_info.pose.y = self.position[1]
         share_info.pose.theta = self.heading
@@ -43,8 +45,8 @@ class PubTest:
             
         for o in self.obstacles:
             obstacle = Obstacle()
-            obstacle.cls = o[0]
-            obstacle.id = o[1]
+            obstacle.cls.data = o[0]
+            obstacle.id.data = o[1]
             obstacle.pose.x = o[2]
             obstacle.pose.y = o[3]
             obstacle.pose.theta = o[4]

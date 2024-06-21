@@ -39,7 +39,8 @@ class Simulator:
         self.x = 0
         self.y = 0
         self.yaw = 0
-        self.current_velocity = 0
+        self.v = 0
+        self.obstacles = [] 
 
         self._steer = 0
         self._accel = 0
@@ -64,19 +65,20 @@ class Simulator:
     def set_ego(self, map):
         if map == 'Pangyo':
             self.ego = Vehicle(-10.687, 0.029, -3.079)
+            self.obstacles = [[-34.195, 0.133, -3.129, 3, 1], [-22.365, -3.371, 3.076, 5, 1]]
         elif map == 'Harbor':
             self.ego = Vehicle(559.144, -112.223, 3.074)
         elif map == 'KIAPI_Racing':
             self.ego = Vehicle(0, 0, 1.664)
         elif map == 'Solbat':
             self.ego = Vehicle(7.266, -4.898, 2.597)
-
-    def execute(self):
+    
+    def execute(self, shutdown_event):
         rate = rospy.Rate(2)
-        while not rospy.is_shutdown():
+        while not rospy.is_shutdown() and not shutdown_event:
             if self.ego == None:
                 continue
             dt = 0.5
-            self.x, self.y, yaw, self.current_velocity = self.ego.next_state(dt, self._steer, self._accel, self._brake)
+            self.x, self.y, yaw, self.v = self.ego.next_state(dt, self._steer, self._accel, self._brake)
             self.yaw = math.degrees(yaw)
             rate.sleep()

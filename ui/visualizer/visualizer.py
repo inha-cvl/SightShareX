@@ -59,7 +59,6 @@ class Visualizer:
         viz_path = path_viz(path, "ego")
         obses = []
         for obs in msg.obstacles:
-            print(obs)
             obses.append([obs.pose.x, obs.pose.y, obs.pose.theta])
         viz_obstacles = ObstaclesViz(obses)
         self.pub_ego_obstacles_viz.publish(viz_obstacles)
@@ -94,5 +93,5 @@ class Visualizer:
     
 
 if __name__ == "__main__":
-    type = str(sys.argv[1])# sim, ioniq5, i30
+    type = str(sys.argv[1])# sim, ego, target
     visualizer = Visualizer(type)
