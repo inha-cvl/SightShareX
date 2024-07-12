@@ -2,6 +2,8 @@
 import rospy
 import threading
 import signal
+import atexit
+from datetime import datetime
 
 from sightsharex.msg import *
 from std_msgs.msg import Float32MultiArray
@@ -15,8 +17,9 @@ class RosManager:
         rospy.init_node(f"{type}_v2v_sharing")
         self.v2v_sharing = v2v_sharing
         self.set_values()
+        self.init_log_file()
         self.set_protocol()
-    
+        
     def set_values(self):
         self.Hz = 5
         self.rate = rospy.Rate(self.Hz)
@@ -44,11 +47,25 @@ class RosManager:
         self.vehicle_path = paths
         obstacles = []
         for o in msg.obstacles:
-            obstacles.append((o.cls, o.pose.x, o.pose.y, o.pose.theta, o.velocity.data))
+            obstacles.append((o.cls.data, o.pose.x, o.pose.y, o.pose.theta, o.velocity.data))
         self.vehicle_obstacles = obstacles
     
     def publish_calc(self, system):
         self.pub_communication_performance.publish(Float32MultiArray(data=list(system.values())))
+        self.log_system_values(system)
+    
+    def log_system_values(self, system):
+        values = list(system.values())
+        self.log_file.write(','.join(map(str, values)) + '\n')
+        self.log_file.flush()
+    
+    def init_log_file(self):
+        self.log_file = open(f"{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt", "w")
+        atexit.register(self.close_log_file)
+
+    def close_log_file(self):
+        if self.log_file:
+            self.log_file.close()
 
     def publish(self, result):
         if result == [0,0,0]:
@@ -77,11 +94,10 @@ class RosManager:
             for obs in vehicle_obstalce:
                 obstacle = Obstacle()
                 obstacle.cls = obs[0]
-                obstacle.id = obs[1]
-                obstacle.pose.x = obs[2]
-                obstacle.pose.y = obs[3]
-                obstacle.pose.theta = obs[4]
-                obstacle.pose.velocity.data = obs[5]
+                obstacle.pose.x = obs[1]
+                obstacle.pose.y = obs[2]
+                obstacle.pose.theta = obs[3]
+                obstacle.velocity.data = obs[4]
                 share_info.obstacles.append(obstacle)
             
         self.pub_target_info.publish(share_info)
@@ -111,7 +127,8 @@ class RosManager:
             calc_rates_res = self.v2v_sharing.do_calc_rate(self.Hz)
             if calc_rates_res < 0:
                 rospy.logerr("[V2X ROSManager] Rx Not Working")
-                return -1
+                rate.sleep()
+                continue
             rate.sleep()
 
     def do_calc(self):

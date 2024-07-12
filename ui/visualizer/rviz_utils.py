@@ -4,6 +4,7 @@ import math
 
 import rospy
 from geometry_msgs.msg import Point
+import tf.transformations
 from visualization_msgs.msg import Marker, MarkerArray
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -151,10 +152,13 @@ def CarViz(frame_id, name_space, position, color):
     marker.pose.orientation.w = quaternion[3]
     return marker
 
-def ObstaclesViz(objects):
+def ObstaclesViz(objects, type):
     marker_array = MarkerArray()
     marker = Marker()
-    color = [145, 255, 232, 1]
+    if type == 'target':
+        color = [255, 198, 145, 1]
+    else:
+        color = [145, 255, 232, 1]
     for n, obj in enumerate(objects):
         marker = ObstacleViz(n+1000, (round(obj[0],1), round(obj[1],1)), obj[2], color)
         marker_array.markers.append(marker)
@@ -165,12 +169,12 @@ def ObstacleViz(_id, position, heading, color):
     marker.header.frame_id = 'world'
     marker.ns = 'object'
     marker.id = _id
-    marker.type = Marker.CUBE
+    marker.type = Marker.SPHERE
     marker.action = Marker.ADD
     marker.lifetime = rospy.Duration(0)
     marker.scale.x = 2.0
-    marker.scale.y = 4.0
-    marker.scale.z = 1.0
+    marker.scale.y = 2.0
+    marker.scale.z = 2.0
     marker.color.r = color[0]/255
     marker.color.g = color[1]/255
     marker.color.b = color[2]/255
@@ -178,7 +182,8 @@ def ObstacleViz(_id, position, heading, color):
     marker.pose.position.x = position[0]
     marker.pose.position.y = position[1]
     marker.pose.position.z = 0
-    quaternion = tf.transformations.quaternion_from_euler(0, 0, math.radians(heading+90))
+    # quaternion = tf.transformations.quaternion_from_euler(0, 0, math.radians(math.degrees(heading)+135))
+    quaternion = tf.transformations.quaternion_from_euler(0, 0, math.radians(heading))
     marker.pose.orientation.x = quaternion[0]
     marker.pose.orientation.y = quaternion[1]
     marker.pose.orientation.z = quaternion[2]

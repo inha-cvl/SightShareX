@@ -96,7 +96,6 @@ class SocketHandler:
         p_share_info.contents.obstacle_num = socket.htons(len(obstacles))
         if len(obstacles) > 0:
             for o, obj in enumerate(obstacles):
-                print("obj", obj)
                 obstacle = cast(addressof(p_share_info.contents)+sizeof(SharingInformation)+(o*sizeof(ObstacleInformation)), POINTER(ObstacleInformation))
                 obstacle.contents.cls = int(obj[0])
                 obstacle.contents.enu_x = float(obj[1])
@@ -126,8 +125,6 @@ class SocketHandler:
         data = self.tx_buf[:send_len]
         
         self.communication_performance['packet_size'] = send_len
-
-        self.print_datum(send_len, self.tx_cnt, self.rx_cnt, state, paths, obstacles)
     
         return self.send(data, send_len)
 
@@ -136,6 +133,7 @@ class SocketHandler:
         if data == None:
             return -1
         if len(data) > SIZE_WSR_DATA:
+            print(f"[Socket Handler]                  Received rx_cnt:{self.tx_cnt_from_rx}")
             self.rx_cnt += 1
             self.rx_rate += 1
             hdr_ofs = V2x_App_Hdr.data.offset
@@ -145,8 +143,8 @@ class SocketHandler:
             tlvc = V2x_App_SI_TLVC.from_buffer_copy(data,tlvc_ofs)
             sharing_information = tlvc.data
             self.set_rx_values(sharing_information)
-            self.tx_cnt_from_rx = sharing_information.tx_cnt
-            self.calc_rtt(sharing_information.tx_cnt_from_rx)
+            self.tx_cnt_from_rx = socket.ntohl(sharing_information.tx_cnt)
+            self.calc_rtt( socket.ntohl(sharing_information.tx_cnt_from_rx))
             obstacles = []
             for i in range(socket.ntohs(sharing_information.obstacle_num)):
                 ofs = tlvc_ofs+sizeof(V2x_App_SI_TLVC)+(i*sizeof(ObstacleInformation))
@@ -178,17 +176,8 @@ class SocketHandler:
         if self.tx_cnt < 1 or self.rx_cnt < 1:
             return -1
         else:
-            earthRadius = 6371000.0
-            lat1 = math.radians(self.tx_latitude)
-            long1 = math.radians(self.tx_longitude)
-            lat2 = math.radians(self.rx_latitude)
-            long2 = math.radians(self.rx_longtude)
-
-            dLat = lat2-lat1
-            dLong = long2-long1
-            a = math.sin(dLat / 2) * math.sin(dLat / 2) + math.cos(lat1) * math.cos(lat2) * math.sin(dLong / 2) * math.sin(dLong / 2)
-            c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-            distance = earthRadius * c
+            distance = math.sqrt((self.rx_latitude - self.tx_latitude) ** 2 + (self.rx_longtude - self.tx_longitude) ** 2)
+            self.communication_performance['v2x'] = 1
             self.communication_performance['distance'] = distance   
             return self.communication_performance        
 
@@ -199,17 +188,18 @@ class SocketHandler:
             self.prev_rx_rate = self.rx_rate
             rx_rate = (float(self.rx_rate)/hz)*100
             self.communication_performance['packet_rate'] = rx_rate
+            self.rx_rate = 0
             return 1
 
 
     def send(self, data, send_size):
         try:
             self.fd.sendall(data)
-            print("[Socket Handler] Packet Sent")
+            print(f"[Socket Handler] Sent tx_cnt:{self.tx_cnt}")
             self.rtt_ts_list.append([self.tx_cnt, time.time()])
             self.tx_cnt += 1
             current_time = time.time()
-            tx_time = self.tx_start_time - current_time
+            tx_time = current_time - self.tx_start_time
             mbps = (send_size/tx_time)/1000000
             self.communication_performance['mbps'] = mbps 
             self.tx_start_time = current_time
@@ -222,7 +212,6 @@ class SocketHandler:
     def receive(self):
         try:
             data = self.fd.recv(sizeof(c_char)*MAX_TX_PACKET_TO_OBU)
-            print("[Socket Handler] Packet Received")
             return data
         except socket.error as e:
             print(f"[Socket Handler] {e}")
@@ -284,7 +273,6 @@ class SocketHandler:
         vehicle_obstacles = []
         for obs in obstacles:
             vehicle_obstacles.append([obs.cls, obs.enu_x, obs.enu_y, obs.heading, obs.velocity])
-        self.print_datum(data_size, tx_cnt, tx_cnt_from_rx, vehicle_state, vehicle_path, vehicle_obstacles)
         return vehicle_state, vehicle_path, vehicle_obstacles
 
 
@@ -330,7 +318,7 @@ class SocketHandler:
         print()  # 줄바꿈
     
     def print_datum(self, data_size, tx_cnt, rx_cnt, vehicle_state, vehicle_path, vehicle_obstacles):
-        print(f"Print Data\ndata_size:{data_size} tx_cnt:{tx_cnt} rx_cnt:{rx_cnt}")
+        print(f"[Print Data] data_size:{data_size} tx_cnt:{tx_cnt} rx_cnt:{rx_cnt}")
         #print(f"state:{vehicle_state[0]}\nlat:{vehicle_state[2]} lng:{vehicle_state[3]} h:{vehicle_state[4]} v:{vehicle_state[5]}")
         # if vehicle_path != []:
         #     print(f"path: x={vehicle_path[0][0]} y={vehicle_path[0][1]} ~ x={vehicle_path[-1][0]} y={vehicle_path[-1][1]}")
