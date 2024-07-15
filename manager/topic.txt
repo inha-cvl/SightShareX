@@ -1,0 +1,1 @@
+/ego/CommunicationPerformance /ego/EgoShareInfo /ego/TargetShareInfo /mobinha/perception/lidar/track_box /novatel/oem7/inspva /novatel/oem7/odom /gmsl_camera/dev/video0/compressed 
