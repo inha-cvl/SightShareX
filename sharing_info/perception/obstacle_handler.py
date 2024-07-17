@@ -35,45 +35,53 @@ class ObstacleHandler:
         return obj_x, obj_y
     
     def filtering_by_lane_num(self, lane_num, fred_d):
-        if lane_num == 1:
-            if -1.45< fred_d < 4.15:
-                return True
-            else:
-                return False
-        elif lane_num == 2:
-            if -4.15 < fred_d < 4.15:
+        if lane_num == 2:
+            if -4.15 < fred_d < 1.45:
                 return True
             else:
                 return False
         elif lane_num == 3:
-            if -4.15 < fred_d < 1.5:
+            if -7.15 < fred_d < 4.15:
                 return True
             else:
                 return False
+        else:
+            if -1.45< fred_d < 4.15:
+                return True
+            else:
+                return False
+
+    
+    def filtering_by_frenet(self,fred_d):
+        if -4.15 < fred_d < 1.5:
+            return True
+        else:
+            return False
             
     def distance(self, x1, y1, x2, y2):
         return np.sqrt((x2-x1)**2+(y2-y1)**2)
 
-    def object2frenet(self, obs_enu):  
+    def object2frenet(self, local_waypoints, obj_enu):
+        if len(local_waypoints) > 0:  
+            centerline = np.array(local_waypoints)
+            point = np.array(obj_enu)
 
-        n_x = self.local_pose[0] - self.prev_local_pose[0]
-        n_y = self.local_pose[1] - self.prev_local_pose[1]
-        x_x = obs_enu[0] - self.prev_local_pose[0]
-        x_y = obs_enu[1] - self.prev_local_pose[1]
-
-        if (n_x*n_x+n_y*n_y) > 0:
-            proj_norm = (x_x*n_x+x_y*n_y)/(n_x*n_x+n_y*n_y)
+            tangents = np.gradient(centerline, axis=0)
+            tangents = tangents / np.linalg.norm(tangents, axis=1)[:, np.newaxis]
+            
+            normals = np.column_stack([-tangents[:, 1], tangents[:, 0]])
+            
+            distances = np.linalg.norm(centerline - point, axis=1)
+            
+            closest_index = np.argmin(distances)
+            closest_point = centerline[closest_index]
+            tangent = tangents[closest_index]
+            normal = normals[closest_index]
+            
+            vector_to_point = point - closest_point
+            d = np.dot(vector_to_point, normal)
+            s = np.sum(np.linalg.norm(np.diff(centerline[:closest_index + 1], axis=0), axis=0))
+            
+            return s, d
         else:
-            proj_norm = 0
-        proj_x = proj_norm*n_x
-        proj_y = proj_norm*n_y
-        
-        frenet_d = self.distance(x_x, x_y, proj_x, proj_y)
-
-        normal_x, normal_y = n_y, -n_x
-        dot_product = normal_x * x_x + normal_y * x_y
-        if dot_product < 0:
-            frenet_d *= -1
-
-        self.prev_local_pose = self.local_pose
-        return frenet_d
+            return obj_enu[0], obj_enu[1]

@@ -11,6 +11,7 @@ from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Pose2D
 from jsk_recognition_msgs.msg import BoundingBoxArray
 from visualization_msgs.msg import MarkerArray
+from std_msgs.msg import Int8
 
 def signal_handler(sig, frame):
     rospy.signal_shutdown("SIGINT received")
@@ -36,8 +37,10 @@ class ROSManager:
         self.user_signal = 0
         self.lidar_obstacles = []
         self.local_path = None
-        self.local_lane_num = 1
+        self.local_lane_waypoints = []
+        self.local_lane_number = 1
         self.local_kappa = None
+        self.state = 0
 
         proj_wgs84 = Proj(proj='latlong', datum='WGS84') 
         proj_enu = Proj(proj='aeqd', datum='WGS84', lat_0=self.map.base_lla[0], lon_0=self.map.base_lla[1], h_0=self.map.base_lla[2])
@@ -48,6 +51,7 @@ class ROSManager:
         rospy.Subscriber('/novatel/oem7/inspva', INSPVA, self.novatel_inspva_cb)
         rospy.Subscriber('/novatel/oem7/odom', Odometry, self.novatel_odom_cb)
         rospy.Subscriber('/mobinha/perception/lidar/track_box', BoundingBoxArray, self.lidar_cluster_cb)
+        rospy.Subscriber('/user_input', Int8, self.user_input_cb)
         self.pub_ego_share_info = rospy.Publisher(f'/{self.type}/EgoShareInfo', ShareInfo, queue_size=1)
         self.pub_lmap_viz = rospy.Publisher('/lmap_viz', MarkerArray, queue_size=10,latch=True)
 
@@ -63,6 +67,9 @@ class ROSManager:
     def novatel_odom_cb(self, msg):
         self.car_velocity = msg.twist.twist.linear.x
 
+    def user_input_cb(self, msg):
+        self.state = msg.data
+
     def lidar_cluster_cb(self, msg):
         obstacles = []
         for obj in msg.boxes:
@@ -71,12 +78,15 @@ class ROSManager:
             x, y = obj.pose.position.x, obj.pose.position.y
             v_rel = obj.value #velocity
             track_id = obj.label # 1~: tracking
+            if track_id == 0:
+                continue
             w = math.degrees(obj.pose.position.z) +self.car_pose.theta
             nx, ny = self.oh.object2enu([x,y])
-            fred_d = self.oh.object2frenet([nx, ny])
-            if not self.oh.filtering_by_lane_num(self.local_lane_num,fred_d):
+            s, d = self.oh.object2frenet(self.local_lane_waypoints, [nx, ny])
+            if not self.oh.filtering_by_lane_num(self.local_lane_number, d):
                 continue
-            obstacles.append([nx, ny, w, v_rel, track_id])
+            obstacles.append([nx, ny, w, v_rel, int(d)])
+        self.oh.prev_local_pose = [self.car_pose.x, self.car_pose.y]
         self.lidar_obstacles = obstacles
 
     def calc_world_pose(self, x, y):
@@ -96,7 +106,7 @@ class ROSManager:
         if self.car_pose_status == 'No':
             return share_info
         
-        share_info.state.data = 1
+        share_info.state.data = self.state
         share_info.signal.data = 0
         share_info.pose.x = self.car_pose.x
         share_info.pose.y = self.car_pose.y
@@ -137,7 +147,7 @@ class ROSManager:
     def do_path_planning(self):
         rate = rospy.Rate(10)
         while not rospy.is_shutdown() and not self.shutdown_event.is_set():
-            self.local_path, self.local_lane_num, self.local_kappa = self.lpp.execute()
+            self.local_path, self.local_lane_waypoints, self.local_lane_number,  self.local_kappa = self.lpp.execute()
             rate.sleep()
     
     def do_publish(self):
