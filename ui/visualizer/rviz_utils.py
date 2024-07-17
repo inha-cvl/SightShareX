@@ -162,6 +162,8 @@ def ObstaclesViz(objects, type):
     for n, obj in enumerate(objects):
         marker = ObstacleViz(n+1000, (round(obj[0],1), round(obj[1],1)), obj[2], color)
         marker_array.markers.append(marker)
+        marker = CarInfoViz('world',str(n+2000), str(obj[3]),(round(obj[0],1), round(obj[1],1)) )
+        marker_array.markers.append(marker)
     return marker_array
 
 def ObstacleViz(_id, position, heading, color):
