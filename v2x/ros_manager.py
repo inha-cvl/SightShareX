@@ -60,7 +60,7 @@ class RosManager:
         self.log_file.flush()
     
     def init_log_file(self):
-        self.log_file = open(f"{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt", "w")
+        self.log_file = open(f"../log/{self.type}/{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt", "w")
         atexit.register(self.close_log_file)
 
     def close_log_file(self):
