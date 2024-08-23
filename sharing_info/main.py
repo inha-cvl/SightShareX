@@ -26,7 +26,6 @@ def main():
     else:
         simulator = Simulator(map_name)
     
-
     ros_manager = ROSManager(type, map, local_path_planner, obstacle_handler, control, simulator=simulator)
     ros_manager.execute()
 

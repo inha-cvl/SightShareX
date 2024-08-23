@@ -142,7 +142,7 @@ class ROSManager:
     def update_value(self):
         rate = rospy.Rate(20)
         while not rospy.is_shutdown() and not self.shutdown_event.is_set() :
-            if self.type != 'ego' or self.type != 'target':
+            if self.simulator is not None:
                 self.set_sim_pose()
             self.lpp.update_value([self.car_pose.x, self.car_pose.y], self.car_velocity, self.user_signal)
             self.oh.update_value([self.car_pose.x, self.car_pose.y], self.car_pose.theta)
@@ -160,7 +160,7 @@ class ROSManager:
         rate = rospy.Rate(20)
         while not rospy.is_shutdown() and not self.shutdown_event.is_set():
             share_info = self.organize_share_info()
-            if self.type != 'ego' or self.type != 'target':
+            if self.simulator is not None:
                 actuator = self.ct.execute()
                 self.simulator.set_target_actuator(actuator)
             self.pub_ego_share_info.publish(share_info)
@@ -170,21 +170,21 @@ class ROSManager:
         signal.signal(signal.SIGINT, signal_handler)
         rospy.loginfo("[SharingInfo] ROS Manger starting ... ")
 
-        if self.type != 'ego' or self.type != 'target':
+        if self.simulator is not None:
             thread1 = threading.Thread(target=self.simulator.execute, args=(self.shutdown_event.is_set(),))
 
         thread2 = threading.Thread(target=self.update_value)
         thread3 = threading.Thread(target=self.do_path_planning)
         thread4 = threading.Thread(target=self.do_publish)
 
-        if self.type != 'ego' or self.type != 'target':
+        if self.simulator is not None:
             thread1.start()
         thread2.start()
         thread3.start()
         thread4.start()
 
         try:
-            if self.type != 'ego' or self.type != 'target':
+            if self.simulator is not None:
                 thread1.join()
             thread2.join()
             thread3.join()
