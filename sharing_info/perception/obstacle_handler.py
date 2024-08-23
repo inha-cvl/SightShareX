@@ -100,8 +100,7 @@ class ObstacleHandler:
             delta_y = next_point[1] - prev_point[1]
             
             heading = math.degrees(math.atan2(delta_y, delta_x))
-            waypoint = idnidx[2]
 
-            return heading, waypoint
+            return heading
         else:
             return None

@@ -97,7 +97,7 @@ class MyApp(QMainWindow):
             q_img = QImage(compressed_image.data, width, height, bytes_per_line, QImage.Format_RGB888).rgbSwapped()
             pixmap = QPixmap.fromImage(q_img)
             scaled_pixmap = pixmap.scaled(self.ui.cameraLabel.size(), aspectRatioMode=True)            
-            self.cameraLabel.setPixmap(scaled_pixmap)
+            self.ui.cameraLabel.setPixmap(scaled_pixmap)
 
     def click_state(self, value):
         self.RM.user_value = value

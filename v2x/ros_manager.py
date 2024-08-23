@@ -93,7 +93,7 @@ class RosManager:
         if len(vehicle_obstalce) > 0:
             for obs in vehicle_obstalce:
                 obstacle = Obstacle()
-                obstacle.cls = obs[0]
+                obstacle.cls.data = obs[0]
                 obstacle.pose.x = obs[1]
                 obstacle.pose.y = obs[2]
                 obstacle.pose.theta = obs[3]
