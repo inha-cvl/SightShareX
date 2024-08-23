@@ -4,6 +4,7 @@ import math
 import sys
 import rospy
 from geometry_msgs.msg import PoseWithCovarianceStamped
+from visualization_msgs.msg import Marker
 
 def signal_handler(sig, frame):
     sys.exit(0)
@@ -48,6 +49,7 @@ class Simulator:
 
         self.set_ego(map)
         rospy.Subscriber('/initialpose', PoseWithCovarianceStamped, self.init_pose_cb)
+        self.lh_test_pub = rospy.Publisher('/lh', Marker, queue_size=1)
 
     def init_pose_cb(self, msg):
         x = msg.pose.pose.position.x
@@ -57,10 +59,38 @@ class Simulator:
         _, _, yaw = tf.transformations.euler_from_quaternion(quaternion)
         self.ego.set(x, y, yaw)
 
-    def target_actuator_cb(self, msg):
-        self._steer = msg.steer.data
-        self._accel = msg.accel.data
-        self._brake = msg.brake.data
+    def set_target_actuator(self, msg):
+        self._steer = msg[1]
+        if msg[0] > 0:
+            accel = msg[0]
+            brake = 0
+        else:
+            accel = 0
+            brake = -msg[0]
+
+        self._accel = accel
+        self._brake = brake
+        self.publish_lh(msg[2])
+    
+    def publish_lh(self, point):
+        marker = Marker()
+        marker.type = Marker.SPHERE
+        marker.action = Marker.ADD
+        marker.header.frame_id = 'world'
+        marker.ns = 'lookahead'
+        marker.id = 1
+        marker.lifetime = rospy.Duration(0)
+        marker.scale.x = 2
+        marker.scale.y = 2
+        marker.scale.z = 2
+        marker.color.r = 1
+        marker.color.g = 0
+        marker.color.b = 1
+        marker.color.a = 1
+        marker.pose.position.x = point[0]
+        marker.pose.position.y = point[1]
+        marker.pose.position.z = 1.0
+        self.lh_test_pub.publish(marker)
   
     def set_ego(self, map):
         if map == 'Pangyo':
@@ -71,14 +101,14 @@ class Simulator:
         elif map == 'KIAPI_Racing':
             self.ego = Vehicle(0, 0, 1.664)
         elif map == 'Solbat':
-            self.ego = Vehicle(7.266, -4.898, 2.597)
+            self.ego = Vehicle(825.153, -580.183, -0.658)
     
     def execute(self, shutdown_event):
-        rate = rospy.Rate(2)
+        rate = rospy.Rate(20)
         while not rospy.is_shutdown() and not shutdown_event:
             if self.ego == None:
                 continue
-            dt = 0.5
+            dt = 0.05
             self.x, self.y, yaw, self.v = self.ego.next_state(dt, self._steer, self._accel, self._brake)
             self.yaw = math.degrees(yaw)
             rate.sleep()

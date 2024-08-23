@@ -75,14 +75,8 @@ class ObigoTest:
     def emergency_image_cb(self, msg):
         np_arr = np.frombuffer(msg.data, np.uint8)
         cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-        
-        # 이미지 데이터를 JPEG 형식으로 인코딩
         _, buffer = cv2.imencode('.jpg', cv_image)
-        
-        # Base64로 인코딩
         jpg_as_text = base64.b64encode(buffer).decode('utf-8')
-        
-        # JSON 형식으로 웹 서버에 전송
         payload = json.dumps({"image": jpg_as_text})
         print(f"[Ego Emergency Image] Encoded to JSON")
 

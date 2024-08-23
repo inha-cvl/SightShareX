@@ -13,7 +13,7 @@ from rviz_utils import *
 class Visualizer:
     def __init__(self, type):
         self.type = type
-        rospy.init_node('visualizer', anonymous=False)
+        rospy.init_node(f'{type}_visualizer', anonymous=False)
         self.set_values()
         self.set_protocols()
     

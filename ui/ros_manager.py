@@ -21,6 +21,7 @@ class RosManager:
         self.Hz = 10
         self.rate = rospy.Rate(self.Hz)
         self.user_value = 0
+        self.simulator_value = 0
         self.emergency_image_msg = None
         self.compressed_image = None
         self.states = {
@@ -41,7 +42,8 @@ class RosManager:
         rospy.Subscriber(f'/{self.type}/TargetShareInfo', ShareInfo, self.target_share_info_cb)
         rospy.Subscriber(f'/{self.type}/CommunicationPerformance', Float32MultiArray, self.communication_performance_cb)
         rospy.Subscriber('/gmsl_camera/dev/video0/compressed', CompressedImage, self.image_callback)
-        self.pub_user_input = rospy.Publisher(f'/user_input', Int8, queue_size=1)
+        self.pub_user_input = rospy.Publisher(f'/{self.type}/user_input', Int8, queue_size=1)
+        self.pub_simulator_input = rospy.Publisher(f'/{self.type}/simulator_input', Int8, queue_size=1)
         self.pub_emergency_image = rospy.Publisher(f'/{self.type}/emergency_image', CompressedImage, queue_size=1)
 
     def ego_share_info_cb(self, msg:ShareInfo):
@@ -57,7 +59,9 @@ class RosManager:
 
     def communication_performance_cb(self, msg):
         state, v2x, rtt, mbps, packet_size, packet_rate, distance = msg.data
-        if distance != 0 and self.start_time is None:
+        if rtt == 0:
+            return
+        if self.start_time is None:
             self.start_time = datetime.now()
         self.communication_performance['comulative_time'] = str(datetime.now() - self.start_time)
         self.communication_performance['distance'] = str(round(distance,5))
@@ -68,5 +72,6 @@ class RosManager:
     
     def publish(self):
         self.pub_user_input.publish(Int8(self.user_value))
-        if self.user_value == 1 and self.emergency_image_msg is not None:
+        self.pub_simulator_input.publish(Int8(self.simulator_value))
+        if self.user_value in [4,5,6,7] and self.emergency_image_msg is not None:
             self.pub_emergency_image.publish(self.emergency_image_msg)

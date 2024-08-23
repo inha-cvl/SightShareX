@@ -3,6 +3,8 @@ import copy
 from math import *
 from scipy.ndimage import gaussian_filter1d
 
+from scipy.interpolate import splprep, splev, interp1d
+
 from planning.libs.quadratic_spline_interpolate import QuadraticSplineInterpolate
 
 lanelets = None
@@ -31,7 +33,6 @@ def lanelet_matching(t_pt):
 
     min_dist = float('inf')
     l_id, l_idx = None, None
-
     for i in range(-1, 2):
         for j in range(-1, 2):
             selected_tile = tiles.get((row+i, col+j))
@@ -56,8 +57,8 @@ def get_straight_path(idnidx, path_len):
     ids = [s_n]*lls_len
     u_n = s_n
     u_i = s_i+int(path_len)#*M_TO_IDX)
-    e_i = u_i
-        
+    e_i = lls_len-int(s_i)
+    wps = wps[s_i:u_i]
     while u_i >= lls_len:
         
         _u_n = get_possible_successor(u_n)
@@ -72,8 +73,7 @@ def get_straight_path(idnidx, path_len):
         ids.extend([u_n]*lls_len)
         wps += u_wp
 
-    r = wps[s_i:e_i]
-
+    r = wps[:e_i]
     return r, [u_n, u_i]
 
 def get_cut_idx_ids(id):
@@ -264,3 +264,36 @@ def limit_path_length(path, max_length):
     
     new_path.append(path[-1])
     return new_path
+
+def calculate_R_list(points, base_offset=2, step_size=40):
+    Rs = []
+    numpoints = len(points)
+    last_R = 99999
+    last_offset = step_size * 2
+
+    for i in range(numpoints):
+        if i + base_offset < numpoints - last_offset:
+            epoints = points[i + base_offset]
+            npoints = [points[i + base_offset + step_size], points[i + base_offset + 2 * step_size]]
+            kappa = calc_kappa(epoints, npoints)
+            R = abs(1 / kappa) if kappa != 0 else 99999
+            last_R = R
+            Rs.append(R)
+        else:
+            Rs.append(last_R)
+    return Rs
+
+def interpolate_path(final_global_path, sample_rate=3, smoothing_factor=2.5, interp_points=3):
+    local_path = np.array([(point[0], point[1]) for point in final_global_path])
+
+    sampled_indices = np.arange(0, len(local_path), sample_rate)
+    sampled_local_path = local_path[sampled_indices]
+
+    tck, u = splprep([sampled_local_path[:, 0], sampled_local_path[:, 1]], s=smoothing_factor)
+    t_new = np.linspace(0, 1, len(sampled_local_path) * interp_points)
+    path_interp = np.array(splev(t_new, tck)).T
+    path_interp_list = path_interp.tolist()
+
+    R_list = calculate_R_list(path_interp_list)
+
+    return path_interp_list, R_list

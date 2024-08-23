@@ -3,10 +3,11 @@ import math
 
 
 class ObstacleHandler:
-    def __init__(self):
-        self.setting_values()
+    def __init__(self, phelper):
+        self.setting_values(phelper)
 
-    def setting_values(self):
+    def setting_values(self, phelper):
+        self.phelper = phelper
         self.local_pose = None
         self.prev_local_pose = None
         self.current_heading = 0.0
@@ -59,7 +60,7 @@ class ObstacleHandler:
             return False
             
     def distance(self, x1, y1, x2, y2):
-        return np.sqrt((x2-x1)**2+(y2-y1)**2)
+        return np.sqrt((x2-x1)**2+(y2-y1)**2    )
 
     def object2frenet(self, local_waypoints, obj_enu):
         if len(local_waypoints) > 0:  
@@ -85,3 +86,22 @@ class ObstacleHandler:
             return s, d
         else:
             return obj_enu[0], obj_enu[1]
+    
+    def refine_heading_by_lane(self, obs_pos):
+        idnidx = self.phelper.lanelet_matching(obs_pos)
+        if idnidx is not None:
+            waypoints = self.phelper.lanelets[idnidx[0]]['waypoints']
+            next_idx = idnidx[1]+3 if idnidx[1]+3 < len(waypoints)-4 else len(waypoints)-4
+            
+            prev_point = waypoints[idnidx[1]]
+            next_point = waypoints[next_idx]
+
+            delta_x = next_point[0] - prev_point[0]
+            delta_y = next_point[1] - prev_point[1]
+            
+            heading = math.degrees(math.atan2(delta_y, delta_x))
+            waypoint = idnidx[2]
+
+            return heading, waypoint
+        else:
+            return None
