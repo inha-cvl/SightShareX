@@ -55,7 +55,7 @@ class MyApp(QMainWindow):
         self.prev_state = 0
 
     def set_widgets(self):
-        self.rviz_widget = RvizWidget(self)
+        self.rviz_widget = RvizWidget(self, self.type)
         self.initUI()
     
     def set_timers(self):

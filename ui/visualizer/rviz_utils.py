@@ -168,7 +168,7 @@ def ObstacleViz(_id, position, heading, color):
     marker.id = _id
     marker.type = Marker.SPHERE
     marker.action = Marker.ADD
-    marker.lifetime = rospy.Duration(0.01)
+    marker.lifetime = rospy.Duration(0.5)
     marker.scale.x = 2.0
     marker.scale.y = 2.0
     marker.scale.z = 2.0

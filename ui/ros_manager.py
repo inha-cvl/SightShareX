@@ -41,7 +41,8 @@ class RosManager:
         rospy.Subscriber(f'/{self.type}/EgoShareInfo', ShareInfo, self.ego_share_info_cb)
         rospy.Subscriber(f'/{self.type}/TargetShareInfo', ShareInfo, self.target_share_info_cb)
         rospy.Subscriber(f'/{self.type}/CommunicationPerformance', Float32MultiArray, self.communication_performance_cb)
-        rospy.Subscriber('/gmsl_camera/dev/video0/compressed', CompressedImage, self.image_callback)
+        if self.type != 'target':
+            rospy.Subscriber('/gmsl_camera/dev/video0/compressed', CompressedImage, self.image_callback)
         self.pub_user_input = rospy.Publisher(f'/{self.type}/user_input', Int8, queue_size=1)
         self.pub_simulator_input = rospy.Publisher(f'/{self.type}/simulator_input', Int8, queue_size=1)
         self.pub_emergency_image = rospy.Publisher(f'/{self.type}/emergency_image', CompressedImage, queue_size=1)

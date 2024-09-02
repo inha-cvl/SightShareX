@@ -9,14 +9,18 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
 
 class RvizWidget(rviz.VisualizationFrame):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, type='ego'):
         super(RvizWidget, self).__init__(parent)
         self.setContentsMargins(0, 0, 0, 0)
         self.setSplashPath('')
         self.initialize()
         reader = rviz.YamlConfigReader()
         config = rviz.Config()
-        reader.readFile(config, "./rviz/share_info.rviz")
+        print(type)
+        if type == 'target' or type == 'sim_target':
+            reader.readFile(config, "./rviz/target_share_info.rviz")
+        else:
+            reader.readFile(config, "./rviz/ego_share_info.rviz")
         self.load(config)
         self.setMenuBar(None)
         self.setStatusBar(None)

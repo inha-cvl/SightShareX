@@ -36,13 +36,23 @@ class ObstacleHandler:
         return obj_x, obj_y
     
     def filtering_by_lane_num(self, lane_num, fred_d):
-        if lane_num == 2:
-            if -4.15 < fred_d < 1.45:
+        if lane_num == 1:
+            if -7.15 < fred_d < 1.45:
+                return True
+            else:
+                return False
+        elif lane_num == 2:
+            if -1.45 < fred_d < 4.15:
                 return True
             else:
                 return False
         elif lane_num == 3:
-            if -7.15 < fred_d < 4.15:
+            if -4.15 < fred_d < 7.15:
+                return True
+            else:
+                return False
+        elif lane_num == 4 or lane_num == 5:
+            if -1.45 < fred_d < 10.15 :
                 return True
             else:
                 return False
@@ -52,17 +62,13 @@ class ObstacleHandler:
             else:
                 return False
 
-    
-    def filtering_by_frenet(self,fred_d):
-        if -4.15 < fred_d < 1.5:
-            return True
-        else:
-            return False
-            
     def distance(self, x1, y1, x2, y2):
         return np.sqrt((x2-x1)**2+(y2-y1)**2    )
 
     def object2frenet(self, local_waypoints, obj_enu):
+        if local_waypoints is None:
+            return None
+        
         if len(local_waypoints) > 0:  
             centerline = np.array(local_waypoints)
             point = np.array(obj_enu)

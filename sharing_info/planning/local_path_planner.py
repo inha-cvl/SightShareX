@@ -42,6 +42,17 @@ class LocalPathPlanner:
         self.current_velocity = velocity
         self.current_signal = signal
     
+    def current_lane_waypoints(self, local_pose): 
+        idnidx = phelper.lanelet_matching(local_pose)
+        if idnidx is None:
+            return [], 1
+        else:
+            l_id, _ = idnidx
+            lane_number = phelper.lanelets[l_id]['laneNo']
+            curr_lane_waypoints = phelper.lanelets[l_id]['waypoints']
+            curr_lane_waypoints = curr_lane_waypoints[:200] if len(curr_lane_waypoints) > 200 else curr_lane_waypoints
+            return curr_lane_waypoints, lane_number
+    
     def need_update(self):
         if self.local_path == None:
             return 0
@@ -133,6 +144,7 @@ class LocalPathPlanner:
         if self.local_path == None or len(self.local_path) <= 0:
             return [], []
         #self.local_path, local_kappa = self.phelper.interpolate_path(local_path)
+        local_waypoints, local_lane_number = self.current_lane_waypoints(self.local_pose)
         limit_local_path = self.phelper.limit_path_length(self.local_path, self.max_path_len)
-        return self.local_path, limit_local_path
+        return self.local_path, limit_local_path, local_waypoints, local_lane_number
 

@@ -41,6 +41,8 @@ class ROSManager:
         self.lidar_obstacles = []
         self.dangerous_obstacle = []
         self.limit_local_path = None
+        self.local_waypoints = None
+        self.local_lane_number = None
         self.state = 0
 
         proj_wgs84 = Proj(proj='latlong', datum='WGS84') 
@@ -49,9 +51,14 @@ class ROSManager:
         self.enu2geo_transformter = Transformer.from_proj(proj_enu, proj_wgs84)
 
     def set_protocol(self):
-        rospy.Subscriber('/novatel/oem7/inspva', INSPVA, self.novatel_inspva_cb)
-        rospy.Subscriber('/novatel/oem7/odom', Odometry, self.novatel_odom_cb)
-        rospy.Subscriber('/mobinha/perception/lidar/track_box', BoundingBoxArray, self.lidar_cluster_cb)
+        if self.type == 'target':
+            rospy.Subscriber('/target/novatel/oem7/inspva', INSPVA, self.novatel_inspva_cb)
+            rospy.Subscriber('/target/novatel/oem7/odom', Odometry, self.novatel_odom_cb)
+        else:
+            rospy.Subscriber('/novatel/oem7/inspva', INSPVA, self.novatel_inspva_cb)
+            rospy.Subscriber('/novatel/oem7/odom', Odometry, self.novatel_odom_cb)
+        if self.type != 'target':
+            rospy.Subscriber('/mobinha/perception/lidar/track_box', BoundingBoxArray, self.lidar_cluster_cb)
         rospy.Subscriber(f'/{self.type}/user_input', Int8, self.user_input_cb)
         rospy.Subscriber(f'/{self.type}/simulator_input', Int8, self.simulator_input_cb)
         self.pub_ego_share_info = rospy.Publisher(f'/{self.type}/EgoShareInfo', ShareInfo, queue_size=1)
@@ -84,22 +91,29 @@ class ROSManager:
         dangerous_obstacle = []
         min_s = 30
         for obj in msg.boxes:
+            if obj.header.seq < 10 or obj.dimensions.x < 0.6 or obj.dimensions.y < 0.6:
+                continue
             enu = self.oh.object2enu([obj.pose.position.x, obj.pose.position.y])
             if enu is None:
-                return
+                continue
             else:
                 nx, ny = enu
+            
             heading = self.oh.refine_heading_by_lane([nx, ny])
             if heading is None:
-                return
+                continue
             distance = self.oh.distance(self.car_pose.x, self.car_pose.y, nx, ny)
             v_rel = ( obj.value/3.6 if obj.value != 0 else 0 ) + self.car_velocity
-            obstacles.append([nx, ny, heading, v_rel, int(distance)])
-
-            frenet = self.oh.object2frenet(self.local_path, enu)
-            if frenet is not None:
+            frenet = self.oh.object2frenet(self.local_waypoints, enu)
+            if frenet is None:
+                continue
+            else:
                 s, d = frenet
-                if -1 < d < 1 and 0 < s < 30:
+            if not self.oh.filtering_by_lane_num(self.local_lane_number, d):
+                continue
+            else:
+                obstacles.append([nx, ny, heading, v_rel, int(d)])
+                if 0 < s < 30:
                     if s < min_s:
                         dangerous_obstacle = [nx, ny, heading, v_rel, int(distance)]
                         min_s = s
@@ -163,7 +177,7 @@ class ROSManager:
     def do_path_planning(self):
         rate = rospy.Rate(20)
         while not rospy.is_shutdown() and not self.shutdown_event.is_set():
-            self.local_path, self.limit_local_path = self.lpp.execute()
+            self.local_path, self.limit_local_path, self.local_waypoints, self.local_lane_number = self.lpp.execute()
             self.ct.update_value(self.simulator_state, [self.car_pose.x, self.car_pose.y], self.car_velocity, self.car_pose.theta, self.local_path)
             rate.sleep()
     
