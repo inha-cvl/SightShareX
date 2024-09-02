@@ -84,8 +84,6 @@ class ROSManager:
         dangerous_obstacle = []
         min_s = 30
         for obj in msg.boxes:
-            if obj.header.seq < 3:
-                continue
             enu = self.oh.object2enu([obj.pose.position.x, obj.pose.position.y])
             if enu is None:
                 return

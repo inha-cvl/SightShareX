@@ -99,7 +99,7 @@ class Visualizer:
     
     def dangerous_obstacle_cb(self, msg:Float32MultiArray):
         if len(msg.data) > 0:
-            viz_dangerous_obstacles = ObstaclesViz([[msg.data[0], msg.data[1], msg.data[2], msg.data[4]]])
+            viz_dangerous_obstacles = ObstaclesViz([[msg.data[0], msg.data[1], msg.data[2], msg.data[4]]], "ego")
             self.pub_ego_dangerous_obstacle_viz.publish(viz_dangerous_obstacles)
 
 
