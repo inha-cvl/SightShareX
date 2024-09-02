@@ -2,10 +2,9 @@
 from libs.socket_handler import SocketHandler
 
 class V2VSharing:
-    def __init__(self, type):
-        self.socket_handler = SocketHandler(type)
-        self.type = type
-        pass
+    def __init__(self, type, interface):
+        self.socket_handler = SocketHandler(type, interface)
+
     
     def set_obu(self):
         if self.socket_handler.connect() < 0:

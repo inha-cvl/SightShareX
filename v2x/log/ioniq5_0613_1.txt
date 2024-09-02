@@ -1,6 +1,0 @@
-Final Statistics after processing all data points:
-RTT - Min: 81.00, Max: 237754.00, Mean: 100184.31
-Mbps - Min: -0.01, Max: -0.01, Mean: -0.01
-Packet Size - Min: 346.00, Max: 346.00, Mean: 346.00
-Packet Rate - Min: 0.00, Max: 0.00, Mean: 0.00
-Distance - Min: 25275.99, Max: 19644378.00, Mean: 5796937.96

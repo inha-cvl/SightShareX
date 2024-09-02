@@ -54,8 +54,6 @@ class LocalPathPlanner:
     def check_planner_state(self):
         if self.local_path == None:
             return 'INIT'
-        if self.current_signal == 0:
-                self.temp_signal = self.current_signal
         if self.current_signal == 3:
             self.change_state = False
             return 'STRAIGHT'

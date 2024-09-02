@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import struct
 import math
 import time
+import logging
 
 from .v2x_interface import *
 from .crc16 import calc_crc16
@@ -14,7 +15,7 @@ V2V_PSID = EM_V2V_MSG
 IP = '192.168.1.11'
 
 class SocketHandler:
-    def __init__(self, interface):
+    def __init__(self, type, interface):
         self.interface = interface
         self.interface_list = [b'', b'enp4s0', b'enx00e04c6a3d90']
         self.communication_performance = {
@@ -27,6 +28,22 @@ class SocketHandler:
             'distance': 0
         }
         self.rtt_ts_list = []
+        self.tx_message = ""
+        self.set_logger(type)
+
+    def set_logger(self, type):
+        self.logger = logging.getLogger('v2v_communication')
+        self.logger.setLevel(logging.DEBUG)
+        formatted_datetime = datetime.today().strftime('%m%d%H%M')
+        file_handler = logging.FileHandler(f'./log/{type}_{formatted_datetime}.log')
+        file_handler.setLevel(logging.DEBUG)
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.DEBUG)
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        file_handler.setFormatter(formatter)
+        console_handler.setFormatter(formatter)
+        self.logger.addHandler(file_handler)
+        self.logger.addHandler(console_handler)
 
     def connect(self):
         try:
@@ -36,15 +53,15 @@ class SocketHandler:
                 try:
                     self.fd.setsockopt(socket.SOL_SOCKET, 25, interface_name)
                 except PermissionError:
-                    print("[Socket Handler] Permission denied for SO_BINDTODEVICE")
+                    self.logger.error("Permission denied for SO_BINDTODEVICE")
                     return -1
                 
             servaddr = socket.getaddrinfo(IP, DEST_PORT, socket.AF_INET, socket.SOCK_STREAM)
             self.fd.connect(servaddr[0][4])
-            print("[Socket Handler] Socket Opend")
+            self.logger.debug("Socket Opend")
             return 1
         except socket.error as e:
-            print(f"[Socket Handler] {e}")
+            self.logger.error(f"{e}")
             return -1
     
     def register(self):
@@ -125,7 +142,7 @@ class SocketHandler:
         data = self.tx_buf[:send_len]
         
         self.communication_performance['packet_size'] = send_len
-    
+        self.tx_message = self.get_log_datum(state,paths,obstacles)
         return self.send(data, send_len)
 
     def rx(self):
@@ -133,7 +150,7 @@ class SocketHandler:
         if data == None:
             return -1
         if len(data) > SIZE_WSR_DATA:
-            print(f"[Socket Handler]                  Received rx_cnt:{self.tx_cnt_from_rx}")
+            self.logger.info(f"                 Received rx_cnt:{self.tx_cnt_from_rx}")
             self.rx_cnt += 1
             self.rx_rate += 1
             hdr_ofs = V2x_App_Hdr.data.offset
@@ -151,6 +168,8 @@ class SocketHandler:
                 obstacle = ObstacleInformation.from_buffer_copy(data[ofs:ofs+sizeof(ObstacleInformation)])
                 obstacles.append(obstacle)
             state, path, obstacles = self.organize_data(len(data), sharing_information, obstacles)
+            rx_message = self.get_log_datum(state, path, obstacles)
+            self.logger.info(rx_message)
             return [state, path, obstacles]
         else:
             return [0, 0, 0]
@@ -178,7 +197,8 @@ class SocketHandler:
         else:
             distance = math.sqrt((self.rx_latitude - self.tx_latitude) ** 2 + (self.rx_longtude - self.tx_longitude) ** 2)
             self.communication_performance['v2x'] = 1
-            self.communication_performance['distance'] = distance   
+            self.communication_performance['distance'] = distance
+            self.logger.info(self.get_performance_log())  
             return self.communication_performance        
 
     def calc_rate(self, hz):
@@ -195,7 +215,8 @@ class SocketHandler:
     def send(self, data, send_size):
         try:
             self.fd.sendall(data)
-            print(f"[Socket Handler] Sent tx_cnt:{self.tx_cnt}")
+            self.logger.info(f"Sent tx_cnt:{self.tx_cnt}")
+            self.logger.info(self.tx_message)
             self.rtt_ts_list.append([self.tx_cnt, time.time()])
             self.tx_cnt += 1
             current_time = time.time()
@@ -205,7 +226,7 @@ class SocketHandler:
             self.tx_start_time = current_time
             return 1
         except socket.error as e:
-            print(f"[Socket Handler] {e}")
+            self.logger.error(f"{e}")
             return -1
     
     
@@ -214,7 +235,7 @@ class SocketHandler:
             data = self.fd.recv(sizeof(c_char)*MAX_TX_PACKET_TO_OBU)
             return data
         except socket.error as e:
-            print(f"[Socket Handler] {e}")
+            self.logger.error(f"{e}")
             return None
         
     def get_base(self):
@@ -229,10 +250,10 @@ class SocketHandler:
         self.tx_buf, self.hdr = self.get_base()
         self.tx_msg = cast(addressof(self.hdr.contents) + V2x_App_Hdr.data.offset, POINTER(V2x_App_TxMsg))
         if self.tx_buf == None or self.hdr == None or self.tx_msg == None:
-            print("[Socket Handler] V2x_APP_Hdr memory setting error")
+            self.logger.error("V2x_APP_Hdr memory setting error")
             return -1
         else:  
-            print("[Socket Handler] Tx Send Set")
+            self.logger.debug("Tx Send Set")
             return 1
     
     def set_rx(self):
@@ -245,10 +266,10 @@ class SocketHandler:
         self.rx_longtude = 0
         
         if self.rx_buf == None:
-            print("[Socket Handler] Receive memory setting error")
+            self.logger.error("Receive memory setting error")
             return -1
         else:  
-            print("[Socket Handler] Rx Send Set")
+            self.logger.debug("Rx Send Set")
             return 1
 
     def get_p_overall(self, cnt):
@@ -312,17 +333,27 @@ class SocketHandler:
         return struct.unpack('>Q', packed_value)[0]
 
     def print_hexa(self, data):
-        print("Binary data in hexadecimal: ", end="")
+        self.logger.info("Binary data in hexadecimal: ", end="")
         for byte in data:  # buf의 각 바이트에 대해 반복
             print(f"{byte:02X} ", end="")  # 각 바이트를 16진수 형식으로 출력
         print()  # 줄바꿈
     
-    def print_datum(self, data_size, tx_cnt, rx_cnt, vehicle_state, vehicle_path, vehicle_obstacles):
-        print(f"[Print Data] data_size:{data_size} tx_cnt:{tx_cnt} rx_cnt:{rx_cnt}")
-        #print(f"state:{vehicle_state[0]}\nlat:{vehicle_state[2]} lng:{vehicle_state[3]} h:{vehicle_state[4]} v:{vehicle_state[5]}")
-        # if vehicle_path != []:
-        #     print(f"path: x={vehicle_path[0][0]} y={vehicle_path[0][1]} ~ x={vehicle_path[-1][0]} y={vehicle_path[-1][1]}")
-        # print(f"There are {len(vehicle_obstacles)} obstacles")
-        # if len(vehicle_obstacles) > 0:
-        #     for i, obs in enumerate(vehicle_obstacles):
-        #         print(f"[{i}] cls:{obs[0]} enu_x:{obs[1]} enu_y:{obs[2]} h:{obs[3]} v:{obs[4]}")
+    def get_log_datum(self, vehicle_state, vehicle_path, vehicle_obstacles):
+        if len(vehicle_state) > 0:
+            state = f"state:{vehicle_state[0]} lat:{vehicle_state[2]} lng:{vehicle_state[3]} h:{vehicle_state[4]} v:{vehicle_state[5]}\n"
+        else:
+            state = "No message to Send\n"
+        if vehicle_path != []:
+            path = f"path: x={vehicle_path[0][0]} y={vehicle_path[0][1]} ~ x={vehicle_path[-1][0]} y={vehicle_path[-1][1]}\n"
+        else:
+            path = f"Threre is no path\n"
+        obstacle_number = f"There are {len(vehicle_obstacles)} obstacles\n"
+        obstacles_info = ""
+        if len(vehicle_obstacles) > 0:
+            for i, obs in enumerate(vehicle_obstacles):
+                obstacles_info += f"[{i}] cls:{obs[0]} enu_x:{obs[1]} enu_y:{obs[2]} h:{obs[3]} v:{obs[4]}\n"
+        return state+path+obstacle_number+obstacles_info
+
+    def get_performance_log(self):
+        performance_str = "Communication Performance " + " ".join([f"{key}: {value}" for key, value in self.communication_performance.items()])
+        return performance_str

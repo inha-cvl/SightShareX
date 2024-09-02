@@ -85,7 +85,7 @@ class ObstacleHandler:
             
             return s, d
         else:
-            return obj_enu[0], obj_enu[1]
+            return None
     
     def refine_heading_by_lane(self, obs_pos):
         idnidx = self.phelper.lanelet_matching(obs_pos)
