@@ -1,5 +1,8 @@
-import sys
+#!/usr/bin/env python3
 
+import sys
+import setproctitle
+setproctitle.setproctitle("sharing_info")
 from ros_manager import ROSManager
 from planning.local_path_planner import LocalPathPlanner
 from perception.obstacle_handler import ObstacleHandler

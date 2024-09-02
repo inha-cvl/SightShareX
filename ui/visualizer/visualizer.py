@@ -1,12 +1,14 @@
-
+#!/usr/bin/env python3
 
 import rospy
 import tf
 import sys
-
+import setproctitle
+setproctitle.setproctitle("visualizer")
 from sightsharex.msg import ShareInfo
 from visualization_msgs.msg import Marker
 from geometry_msgs.msg import Quaternion
+from std_msgs.msg import Float32MultiArray
 
 from rviz_utils import *
 
@@ -20,10 +22,13 @@ class Visualizer:
     def set_values(self):
         self.br = tf.TransformBroadcaster()
         self.ego_pos = [0.0, 0.0]
+        colors = [[241, 76, 152, 1],[94,204, 243, 1]]
+        self.ego_color, self.target_color = (colors[1], colors[0]) if self.type in ['target', 'sim_target'] else (colors[0], colors[1])
 
-        self.ego_car = CarViz('ego_car', 'ego_car_marker', [0, 0, 0], [241, 76, 152, 1])
+        
+        self.ego_car = CarViz('ego_car', 'ego_car_marker', [0, 0, 0], self.ego_color)
         self.ego_car_info = CarInfoViz('ego_car', 'ego_car_info', '',[0,0,0])
-        self.target_car = CarViz('world', 'target_car_marker', [0, 0, 0], [94,204, 243, 1])
+        self.target_car = CarViz('world', 'target_car_marker', [0, 0, 0], self.target_color)
         self.target_car_info = CarInfoViz('world', 'target_car_info', '',[0,0,0])
 
     def set_protocols(self):
@@ -36,9 +41,11 @@ class Visualizer:
         self.pub_viz_target_car_info = rospy.Publisher('/visualizer/target_car_info', Marker, queue_size=1)
         self.pub_target_path_viz = rospy.Publisher('/visualizer/local_target_path', Marker, queue_size=1)
         self.pub_ego_obstacles_viz = rospy.Publisher('/visualizer/ego_obstacles', MarkerArray, queue_size=1)
+        self.pub_ego_dangerous_obstacle_viz = rospy.Publisher('/visualizer/ego_dangerous_obstacle', Marker, queue_size=1)
         
         rospy.Subscriber(f'/{self.type}/EgoShareInfo', ShareInfo, self.ego_share_info_cb)
         rospy.Subscriber(f'/{self.type}/TargetShareInfo', ShareInfo, self.target_share_info_cb)
+        rospy.Subscriber(f'/{self.type}/dangerous_obstacle', Float32MultiArray, self.dangerous_obstacle_cb)
 
         rospy.loginfo("Visualizer set")
         rospy.spin()
@@ -56,7 +63,7 @@ class Visualizer:
         path = []
         for pts in msg.paths:
             path.append([pts.pose.x, pts.pose.y])
-        viz_path = path_viz(path, "ego")
+        viz_path = path_viz(path, self.ego_color)
         obses = []
         for obs in msg.obstacles:
             obses.append([obs.pose.x, obs.pose.y, obs.pose.theta, obs.id.data])
@@ -80,7 +87,7 @@ class Visualizer:
         path = []
         for pts in msg.paths:
             path.append([pts.pose.x, pts.pose.y])
-        viz_path = path_viz(path, "target")
+        viz_path = path_viz(path, self.target_color)
         obses = []
         for obs in msg.obstacles:
             obses.append([obs.pose.x, obs.pose.y, obs.pose.theta,  obs.id.data])
@@ -90,6 +97,11 @@ class Visualizer:
         self.pub_viz_target_car.publish(self.target_car)
         self.pub_viz_target_car_info.publish(self.target_car_info)
     
+    def dangerous_obstacle_cb(self, msg:Float32MultiArray):
+        if len(msg.data) > 0:
+            viz_dangerous_obstacles = ObstaclesViz([[msg.data[0], msg.data[1], msg.data[2], msg.data[4]]])
+            self.pub_ego_dangerous_obstacle_viz.publish(viz_dangerous_obstacles)
+
 
 if __name__ == "__main__":
     type = str(sys.argv[1])# sim, ego, target

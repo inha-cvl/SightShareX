@@ -1,0 +1,10 @@
+<launch>
+    <!-- Run main.py as a node with a custom name -->
+    <node name="sharing_info" pkg="sightsharex" type="main.py" args="sim_ego Solbat" output="screen"/>
+
+    <!-- Run visualizer.py as a node with a custom name -->
+    <node name="visualizer" pkg="sightsharex" type="visualizer.py" args="sim_ego" output="screen"/>
+
+    <!-- Run ui.py as a node with a custom name -->
+    <node name="ui" pkg="sightsharex" type="ui.py" args="sim_ego" output="screen"/>
+</launch>

@@ -5,7 +5,7 @@ Panels:
     Property Tree Widget:
       Expanded: ~
       Splitter Ratio: 0.42505592107772827
-    Tree Height: 822
+    Tree Height: 371
   - Class: rviz/Views
     Expanded:
       - /Current View1
@@ -23,7 +23,7 @@ Visualization Manager:
       Marker Topic: /visualizer/ego_car
       Name: Ego Marker
       Namespaces:
-        {}
+        ego_car_marker: true
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
@@ -31,7 +31,7 @@ Visualization Manager:
       Marker Topic: /visualizer/ego_car_info
       Name: Ego Info
       Namespaces:
-        {}
+        ego_car_info: true
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
@@ -47,7 +47,7 @@ Visualization Manager:
       Marker Topic: /visualizer/local_ego_path
       Name: Ego Path
       Namespaces:
-        {}
+        path: true
       Queue Size: 100
       Value: true
     - Class: rviz/Marker
@@ -2238,7 +2238,7 @@ Visualization Manager:
       Marker Topic: /lh
       Name: Marker
       Namespaces:
-        {}
+        lookahead: true
       Queue Size: 100
       Value: true
   Enabled: true
@@ -2269,7 +2269,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
-      Distance: 119.42332458496094
+      Distance: 47.897865295410156
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -2285,9 +2285,9 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.6753983497619629
+      Pitch: 0.1353987455368042
       Target Frame: ego_car
-      Yaw: 3.5372228622436523
+      Yaw: 3.112218141555786
     Saved: ~
 Window Geometry:
   Displays:

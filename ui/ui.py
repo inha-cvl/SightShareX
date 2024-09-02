@@ -1,5 +1,9 @@
+#!/usr/bin/env python3
+
 import sys
 import signal
+import setproctitle
+setproctitle.setproctitle("ui")
 from PyQt5.QtWidgets import QApplication, QMainWindow, QTableWidgetItem
 from PyQt5.QtCore import QTimer
 from PyQt5 import uic

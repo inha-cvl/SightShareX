@@ -21,14 +21,9 @@ def Path(waypoints, id_, z, scale, color):
         marker.points.append(Point(x=pt[0], y=pt[1], z=z))
     return marker
     
-def path_viz(paths, type):
+def path_viz(paths, color):
     if paths == None:
         return
-    if type == 'ego':
-         color =  [241, 76, 152, 1]
-    elif type == 'target':
-        color = [94,204, 243, 1]
-
     return LocalPathViz(paths, color)
 
 def kappa_viz(kappas):
@@ -156,9 +151,9 @@ def ObstaclesViz(objects, type):
     marker_array = MarkerArray()
     marker = Marker()
     if type == 'target':
-        color = [255, 198, 145, 1]
+        color = [255, 140,33, 1]
     else:
-        color = [145, 255, 232, 1]
+        color = [33,255,133, 1]
     for n, obj in enumerate(objects):
         marker = ObstacleViz(n+1000, (round(obj[0],1), round(obj[1],1)), obj[2], color)
         marker_array.markers.append(marker)

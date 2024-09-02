@@ -1,5 +1,4 @@
-import rospy
-
+import time
 import sys
 import signal
 import numpy as np
@@ -28,20 +27,29 @@ class Control():
         self.local_path = []
 
 
+
     def update_value(self, state, local_pose, velocity, heading, path):
         self.state = state
         self.current_location = Point(x=local_pose[0],y=local_pose[1])
         self.current_velocity = velocity
         self.current_heading = heading
+        self.local_path = []
         if path is not None:
             for point in path:
                 self.local_path.append(Point(x=point[0], y=point[1]))
-    
-    def calculate_target_velocity(self, path ):
-        velocities = np.linspace(self.current_velocity, self.max_velocity, len(path))
-        for i in range(1, len(velocities)):
-            velocities[i] = np.mean(velocities[max(0, i-2):i+1])
-        self.target_velocity = velocities[1] if velocities[1] < self.max_velocity else self.max_velocity
+        self.calculate_target_velocity(len(path))
+            
+    def calculate_target_velocity(self, path_len):
+        diff = self.max_velocity - self.current_velocity
+        if path_len > 50:
+            if diff > self.max_velocity / 2 :
+                velocity = self.current_velocity + 1
+            else:
+                velocity = self.current_velocity + 0.5
+        else:
+            velocity = self.current_velocity - 0.5
+        
+        self.target_velocity = velocity if velocity < self.max_velocity else self.max_velocity
         
 
     def execute(self):

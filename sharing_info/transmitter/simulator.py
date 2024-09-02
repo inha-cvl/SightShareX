@@ -2,6 +2,7 @@
 import tf
 import math
 import sys
+import time
 import rospy
 from geometry_msgs.msg import PoseWithCovarianceStamped
 from visualization_msgs.msg import Marker
@@ -96,8 +97,6 @@ class Simulator:
         if map == 'Pangyo':
             self.ego = Vehicle(-10.687, 0.029, -3.079)
             self.obstacles = [[-34.195, 0.133, -3.129, 3, 1], [-22.365, -3.371, 3.076, 5, 1]]
-        elif map == 'Harbor':
-            self.ego = Vehicle(559.144, -112.223, 3.074)
         elif map == 'KIAPI_Racing':
             self.ego = Vehicle(0, 0, 1.664)
         elif map == 'Solbat':
