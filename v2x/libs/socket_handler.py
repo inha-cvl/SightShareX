@@ -343,7 +343,7 @@ class SocketHandler:
             state = f"state:{vehicle_state[0]} lat:{vehicle_state[2]} lng:{vehicle_state[3]} h:{vehicle_state[4]} v:{vehicle_state[5]}\n"
         else:
             state = "No message to Send\n"
-        if vehicle_path != []:
+        if vehicle_path != [] and len(vehicle_path[0]) > 1:
             path = f"path: x={vehicle_path[0][0]} y={vehicle_path[0][1]} ~ x={vehicle_path[-1][0]} y={vehicle_path[-1][1]}\n"
         else:
             path = f"Threre is no path\n"
