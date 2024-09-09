@@ -44,6 +44,7 @@ class ROSManager:
         self.local_waypoints = None
         self.local_lane_number = None
         self.state = 0
+        self.target_state = 0
 
         proj_wgs84 = Proj(proj='latlong', datum='WGS84') 
         proj_enu = Proj(proj='aeqd', datum='WGS84', lat_0=self.map.base_lla[0], lon_0=self.map.base_lla[1], h_0=self.map.base_lla[2])
@@ -54,6 +55,7 @@ class ROSManager:
         if self.type == 'target':
             rospy.Subscriber('/target/novatel/oem7/inspva', INSPVA, self.novatel_inspva_cb)
             rospy.Subscriber('/target/novatel/oem7/odom', Odometry, self.novatel_odom_cb)
+            rospy.Subscriber(f'/{self.type}/TargetShareInfo', ShareInfo, self.target_share_info_cb)
         else:
             rospy.Subscriber('/novatel/oem7/inspva', INSPVA, self.novatel_inspva_cb)
             rospy.Subscriber('/novatel/oem7/odom', Odometry, self.novatel_odom_cb)
@@ -78,6 +80,9 @@ class ROSManager:
     
     def novatel_odom_cb(self, msg):
         self.car_velocity = msg.twist.twist.linear.x
+
+    def target_share_info_cb(self, msg:ShareInfo):
+        self.target_state  = msg.state.data
 
     def user_input_cb(self, msg):
         self.state = msg.data
@@ -169,7 +174,7 @@ class ROSManager:
         while not rospy.is_shutdown() and not self.shutdown_event.is_set() :
             if self.simulator is not None:
                 self.set_sim_pose()
-            self.lpp.update_value([self.car_pose.x, self.car_pose.y], self.car_velocity, self.user_signal)
+            self.lpp.update_value([self.car_pose.x, self.car_pose.y], self.car_velocity, self.user_signal, self.target_state)
             self.oh.update_value([self.car_pose.x, self.car_pose.y], self.car_pose.theta)
             
             rate.sleep()
@@ -223,3 +228,4 @@ class ROSManager:
             thread4.join()
         
         rospy.loginfo("[SharingInfo] ROS Manager has shut down gracefully.")
+

@@ -12,23 +12,25 @@ from hd_map.map import MAP
 from transmitter.simulator import Simulator
 
 def main():
-    if len(sys.argv) != 3 :
-        type = 'sim'
+    if len(sys.argv) != 4 :
+        type = 'ego'
         map_name = 'Solbat'
+        use_sim = True
     else:
         type = str(sys.argv[1])#sim, ego, target
         map_name = str(sys.argv[2])
+        use_sim = bool(sys.argv[3])
     
     map = MAP(map_name)
     local_path_planner  = LocalPathPlanner(map)
     obstacle_handler = ObstacleHandler(local_path_planner.phelper)
     control = Control()
     
-    if type == 'ego' or type == 'target':
-        simulator = None
-    else:
+    if use_sim :
         simulator = Simulator(map_name)
-    
+    else:
+        simulator = None
+        
     ros_manager = ROSManager(type, map, local_path_planner, obstacle_handler, control, simulator=simulator)
     ros_manager.execute()
 

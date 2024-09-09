@@ -31,11 +31,15 @@ class ObigoTest:
         proj_wgs84 = Proj(proj='latlong', datum='WGS84') 
         proj_enu = Proj(proj='aeqd', datum='WGS84', lat_0=self.base_lla[0], lon_0=self.base_lla[1], h_0=self.base_lla[2])
         self.transformer = Transformer.from_proj(proj_enu, proj_wgs84)
-
+        # 비상 상황 식별자 추가
+        self.emergency_type_arr = ['차량 사고','보행자 사고', '고장 차량', '낙하물']
+        self.emergency_type = '정상'
+        
     def set_protocols(self):
         rospy.Subscriber(f'/{self.type}/EgoShareInfo', ShareInfo, self.ego_share_info_cb)
         rospy.Subscriber(f'/{self.type}/CommunicationPerformance', Float32MultiArray, self.communication_performance_cb)
         rospy.Subscriber(f'/{self.type}/emergency_image',CompressedImage, self.emergency_image_cb)
+        rospy.Subscriber = rospy.Subscriber(f'/{self.type}/dangerous_obstacle', Float32MultiArray, self.dangerous_obstacle_cb)
 
         rospy.loginfo("[set_protocols] Subscribing ... ")
         rospy.spin()
@@ -46,6 +50,13 @@ class ObigoTest:
         yaw = msg.pose.theta
         v = msg.velocity.data
 
+        # 비상 상황 식별자 추가
+        state = msg.state.data
+        if state in [4,5,6,7]:
+            self.emergency_type = self.emergency_type_arr[state-4]
+        else:
+            self.emergency_type = '정상'
+            
         print(f"[Ego Share Info] State-> latitude: {latitude}, logitude: {longitude}, heading: {yaw}deg, velocity: {v}m/s")
         
         path = []
@@ -58,6 +69,7 @@ class ObigoTest:
             obs_longitude, obs_latitude, _ = self.transformer.transform(obs.pose.x, obs.pose.y, 3)
             obses.append([obs_latitude, obs_longitude, obs.pose.theta])
             print(f"[Ego Share Info] Obstacle{i+1}-> position: ({obs_latitude},{obs_longitude}), heading: {obs.pose.theta}deg")
+         
 
     def communication_performance_cb(self, msg):
         state, v2x, rtt, mbps, packet_size, packet_rate, distance = msg.data
@@ -79,6 +91,13 @@ class ObigoTest:
         jpg_as_text = base64.b64encode(buffer).decode('utf-8')
         payload = json.dumps({"image": jpg_as_text})
         print(f"[Ego Emergency Image] Encoded to JSON")
+
+    def dangerous_obstacle_cb(self, msg):
+        if len(msg.data) > 0 and self.emergency_type != '정상':
+
+            longitude, latitude, _ = self.transformer.transform(msg.data[0], msg.data[1], 7)
+            # 비상 상황 식별자 추가
+            print(f"[Emergency] {self.emergency_type} 비상 상황이 발생했습니다. 위치 -> latitude: {latitude}, logitude: {longitude}")
 
 if __name__ == "__main__":
     type = str(sys.argv[1])# sim, ego, target

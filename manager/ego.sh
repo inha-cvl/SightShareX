@@ -1,7 +1,7 @@
 #!/bin/bash
 
 cd ../sharing_info
-python3 main.py ego Solbat &
+python3 main.py ego Solbat True &
 cd ../v2x
 python3 main.py ego 1 &
 cd ../ui/visualizer

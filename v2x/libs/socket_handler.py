@@ -43,7 +43,7 @@ class SocketHandler:
         file_handler.setFormatter(formatter)
         console_handler.setFormatter(formatter)
         self.logger.addHandler(file_handler)
-        self.logger.addHandler(console_handler)
+        #self.logger.addHandler(console_handler)
 
     def connect(self):
         try:

@@ -23,7 +23,7 @@ class Visualizer:
         self.br = tf.TransformBroadcaster()
         self.ego_pos = [0.0, 0.0]
         colors = [[241, 76, 152, 1],[94,204, 243, 1]]
-        self.ego_color, self.target_color = (colors[1], colors[0]) if self.type in ['target', 'sim_target'] else (colors[0], colors[1])
+        self.ego_color, self.target_color = (colors[1], colors[0]) if self.type == 'target' else (colors[0], colors[1])
 
         
         self.ego_car = CarViz(f'{self.type}_ego_car', 'ego_car_marker', [0, 0, 0], self.ego_color)

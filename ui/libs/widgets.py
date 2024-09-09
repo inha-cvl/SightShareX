@@ -16,8 +16,7 @@ class RvizWidget(rviz.VisualizationFrame):
         self.initialize()
         reader = rviz.YamlConfigReader()
         config = rviz.Config()
-        print(type)
-        if type == 'target' or type == 'sim_target':
+        if type == 'target':
             reader.readFile(config, "./rviz/target_share_info.rviz")
         else:
             reader.readFile(config, "./rviz/ego_share_info.rviz")

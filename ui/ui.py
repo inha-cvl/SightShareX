@@ -17,7 +17,7 @@ from ros_manager import RosManager
 
 # type에 따라 .ui 파일 선택
 def load_ui_by_type(type):
-    if type == 'target' or type == 'sim_target':
+    if type == 'target':
         return uic.loadUiType("./forms/mainwindow_target.ui")[0]
     else:  # 기본적으로 'ego'로 처리
         return uic.loadUiType("./forms/mainwindow_ego.ui")[0]
@@ -43,7 +43,7 @@ class MyApp(QMainWindow):
 
     def set_values(self):
         self.sig_in = False
-        if self.type == 'target' or self.type == 'sim_target':
+        if self.type == 'target':
             self.ego_state_string = ['정상', '차선 변경 수락', '차선 변경 거절', '', '차량 사고 인지','보행자 사고 인지', '고장 차량 인지', '낙하물 인지' ]
             self.target_state_string = ['정상', '우측 합류 요청', '좌측 합류 요청', '직진 초기화','차량 사고 감지','보행자 사고 감지', '고장 차량 감지', '낙하물 감지']
         else:
@@ -115,7 +115,7 @@ class MyApp(QMainWindow):
         if not self.sig_in:
             self.sig_in = True
             self.user_input_timer.start(100)
-            QTimer.singleShot(3000, self.stop_user_input_timer)
+            QTimer.singleShot(1000, self.stop_user_input_timer)
         else:
             self.stop_user_input_timer
     

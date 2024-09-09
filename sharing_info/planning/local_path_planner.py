@@ -2,6 +2,7 @@
 
 import planning.libs.planning_helper as phelper
 import copy
+import rospy
 import math
 
 KPH_TO_MPS = 1 / 3.6
@@ -21,6 +22,7 @@ class LocalPathPlanner:
         self.local_pose = None
         self.current_velocity = 0.0
         self.current_signal = 0
+        self.target_state = 0
         self.change_state = False
         self.change_id = None
 
@@ -37,10 +39,11 @@ class LocalPathPlanner:
         self.max_path_len = 30
         self.default_len = 120
     
-    def update_value(self, local_pose, velocity, signal):
+    def update_value(self, local_pose, velocity, signal, target_state):
         self.local_pose = local_pose
         self.current_velocity = velocity
         self.current_signal = signal
+        self.target_state = target_state
     
     def current_lane_waypoints(self, local_pose): 
         idnidx = phelper.lanelet_matching(local_pose)
@@ -73,6 +76,14 @@ class LocalPathPlanner:
                 self.temp_signal = self.current_signal
                 self.change_state = True
                 return 'CHANGE'
+            elif self.temp_signal != self.current_signal and self.current_signal in [4,5,6,7] :
+                self.temp_signal = self.current_signal
+                self.change_state = True
+                return 'EMERGENCY_CHANGE'
+            elif self.temp_signal != self.current_signal and self.target_state in [4,5,6,7]:
+                self.temp_signal = self.target_state
+                self.change_state = True
+                return 'EMERGENCY_CHANGE'
             else:
                 return 'STRAIGHT'
         else:
@@ -97,6 +108,21 @@ class LocalPathPlanner:
             r = wps
         return r, uni
     
+    def get_emergency_change_path(self, sni,  path_len):
+        wps, uni = self.phelper.get_straight_path(sni, path_len)
+        c_pt = wps[-1]
+        l_id, r_id = self.phelper.get_neighbor(uni[0])
+        n_id = r_id if r_id is not None else l_id
+        if n_id is not None:
+            r = self.MAP.lanelets[n_id]['waypoints']
+            u_n = n_id
+            u_i = self.phelper.find_nearest_idx(r, c_pt)
+            uni = [u_n, u_i]
+        else:
+            rospy.logerr("[LocalPathPlanner] There is no Space to Change")
+            r = wps
+        return r, uni
+
     def make_path(self, pstate, local_pos):
         start_pose = local_pos 
         idnidx0 = self.phelper.lanelet_matching(start_pose)
@@ -105,6 +131,8 @@ class LocalPathPlanner:
         if pstate == 'CHANGE':
             l_buffer_change = max(0, self.minimum_distance - (self.current_velocity * self.t_reaction_change))
             l_tr1 = self.current_velocity*self.t_reaction_change + l_buffer_change
+        elif pstate == 'EMERGENCY_CHANGE':
+            l_tr1 = self.current_velocity*(self.t_reaction_change-0.5)
         else:
             l_tr1 = self.default_len
 
@@ -119,6 +147,14 @@ class LocalPathPlanner:
             theta = self.theta_range[1] - ((self.current_velocity-self.velocity_range[0])/(self.velocity_range[1]-self.velocity_range[0])) * (self.theta_range[1]-self.theta_range[0])
             l_tr2 = self.d_lane / math.sin(theta)
             tr2, idnidx2 = self.get_change_path(idnidx1, l_tr2, self.temp_signal)
+            l_tr3 = self.L * self.current_velocity + self.default_len/2 if self.current_velocity > 0 else self.L * 3 + self.default_len/2 
+            tr3, idnidx3 = self.phelper.get_straight_path(idnidx2, l_tr3)
+            self.change_id = idnidx2[0]
+            local_path = tr1+tr3
+        elif pstate == 'EMERGENCY_CHANGE':
+            theta = self.theta_range[1] - ((self.current_velocity-self.velocity_range[0])/(self.velocity_range[1]-self.velocity_range[0])) * (self.theta_range[1]-self.theta_range[0])
+            l_tr2 = self.d_lane / math.sin(theta)
+            tr2, idnidx2 = self.get_emergency_change_path(idnidx1, l_tr2)
             l_tr3 = self.L * self.current_velocity + self.default_len/2 if self.current_velocity > 0 else self.L * 3 + self.default_len/2 
             tr3, idnidx3 = self.phelper.get_straight_path(idnidx2, l_tr3)
             self.change_id = idnidx2[0]
