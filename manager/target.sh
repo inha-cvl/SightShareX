@@ -1,7 +1,7 @@
 #!/bin/bash
 
 cd ../sharing_info
-python3 main.py target Solbat True&
+python3 main.py target Solbat 0&
 cd ../v2x
 python3 main.py target 2 &
 cd ../ui/visualizer

@@ -1,15 +1,15 @@
 #!/bin/bash
 
 cd ../sharing_info
-python3 main.py ego Solbat True &
-cd ../v2x
-python3 main.py ego 1 &
+python3 main.py ego Solbat 0 &
+# cd ../v2x
+# python3 main.py ego 0 &
 cd ../ui/visualizer
 python3 visualizer.py ego &
 cd ../
 python3 ui.py ego &
 cd ../utils
-python3 obigo_contro.py ego &
+python3 obigo_control.py ego &
 python3 make_data.py ego
 
 # cd plotjuggler/

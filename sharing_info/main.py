@@ -19,14 +19,14 @@ def main():
     else:
         type = str(sys.argv[1])#sim, ego, target
         map_name = str(sys.argv[2])
-        use_sim = bool(sys.argv[3])
-    
+        use_sim = str(sys.argv[3]) #0: not use, 1:use
+
     map = MAP(map_name)
     local_path_planner  = LocalPathPlanner(map)
     obstacle_handler = ObstacleHandler(local_path_planner.phelper)
     control = Control()
-    
-    if use_sim :
+
+    if use_sim == '1' :
         simulator = Simulator(map_name)
     else:
         simulator = None

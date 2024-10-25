@@ -55,9 +55,7 @@ class MakeData:
     def novatel_inspva_cb(self, msg: INSPVA):
         self.car_pos = [msg.longitude, msg.latitude]
         self.car_heading = 89-msg.azimuth
-        azimuth_rad = math.radians(self.car_heading)
-        forward_velocity = msg.north_velocity * math.cos(azimuth_rad) + msg.east_velocity * math.sin(azimuth_rad)
-        self.car_velocity = forward_velocity
+        self.car_velocity = msg.north_velocity
     
     def novatel_odom_cb(self, msg: Odometry):
         self.car_velocity = msg.twist.twist.linear.x

@@ -173,12 +173,12 @@ class LocalPathPlanner:
     
     def execute(self):
         if self.local_pose is None or self.local_pose[0] == 'inf':
-            return [], []
+            return None
         
         pstate = self.check_planner_state()
         self.local_path = self.make_path(pstate, self.local_pose)
         if self.local_path == None or len(self.local_path) <= 0:
-            return [], []
+            return None
         #self.local_path, local_kappa = self.phelper.interpolate_path(local_path)
         local_waypoints, local_lane_number = self.current_lane_waypoints(self.local_pose)
         limit_local_path = self.phelper.limit_path_length(self.local_path, self.max_path_len)

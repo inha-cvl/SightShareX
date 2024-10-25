@@ -27,7 +27,6 @@ class ROSManager:
         self.ct = control
 
         self.simulator = simulator
-
         self.shutdown_event = threading.Event()
         self.set_values()
         self.set_protocol()
@@ -94,8 +93,8 @@ class ROSManager:
         dangerous_obstacle = []
         min_s = 30
         for obj in msg.boxes:
-            if obj.header.seq < 10 or obj.dimensions.x < 0.6 or obj.dimensions.y < 0.6:
-                continue
+            # if obj.header.seq < 10 or obj.dimensions.x < 0.6 or obj.dimensions.y < 0.6:
+                #continue
             enu = self.oh.object2enu([obj.pose.position.x, obj.pose.position.y])
             if enu is None:
                 continue
@@ -180,8 +179,10 @@ class ROSManager:
     def do_path_planning(self):
         rate = rospy.Rate(20)
         while not rospy.is_shutdown() and not self.shutdown_event.is_set():
-            self.local_path, self.limit_local_path, self.local_waypoints, self.local_lane_number = self.lpp.execute()
-            self.ct.update_value(self.simulator_state, [self.car_pose.x, self.car_pose.y], self.car_velocity, self.car_pose.theta, self.local_path)
+            lpp_result =  self.lpp.execute()
+            if lpp_result is not None:
+                self.local_path, self.limit_local_path, self.local_waypoints, self.local_lane_number = lpp_result
+                self.ct.update_value(self.simulator_state, [self.car_pose.x, self.car_pose.y], self.car_velocity, self.car_pose.theta, self.local_path)
             rate.sleep()
     
     def do_publish(self):
