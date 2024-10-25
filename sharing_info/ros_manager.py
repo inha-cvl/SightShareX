@@ -53,14 +53,12 @@ class ROSManager:
 
     def set_protocol(self):
         if self.type == 'target':
-            rospy.Subscriber('/target/novatel/oem7/inspva', INSPVA, self.novatel_inspva_cb)
-            rospy.Subscriber('/target/novatel/oem7/odom', Odometry, self.novatel_odom_cb)
             rospy.Subscriber(f'/{self.type}/TargetShareInfo', ShareInfo, self.target_share_info_cb)
-        else:
-            rospy.Subscriber('/novatel/oem7/inspva', INSPVA, self.novatel_inspva_cb)
-            rospy.Subscriber('/novatel/oem7/odom', Odometry, self.novatel_odom_cb)
+        rospy.Subscriber('/novatel/oem7/inspva', INSPVA, self.novatel_inspva_cb)
+        rospy.Subscriber('/novatel/oem7/odom', Odometry, self.novatel_odom_cb)
         if self.type != 'target':
             rospy.Subscriber('/mobinha/perception/lidar/track_box', BoundingBoxArray, self.lidar_cluster_cb)
+
         rospy.Subscriber(f'/{self.type}/user_input', Int8, self.user_input_cb)
         rospy.Subscriber(f'/{self.type}/simulator_input', Int8, self.simulator_input_cb)
         self.pub_ego_share_info = rospy.Publisher(f'/{self.type}/EgoShareInfo', ShareInfo, queue_size=1)

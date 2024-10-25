@@ -65,13 +65,13 @@ class ObstacleHandler:
     def distance(self, x1, y1, x2, y2):
         return np.sqrt((x2-x1)**2+(y2-y1)**2    )
 
-    def object2frenet(self, local_waypoints, obj_enu):
-        if local_waypoints is None:
+    def object2frenet(self, trim_path, obs_pose):
+        if trim_path is None:
             return None
         
-        if len(local_waypoints) > 0:  
-            centerline = np.array(local_waypoints)
-            point = np.array(obj_enu)
+        if len(trim_path) > 0:  
+            centerline = np.array([(point[0], point[1]) for point in trim_path])
+            point = np.array(obs_pose)
 
             tangents = np.gradient(centerline, axis=0)
             tangents = tangents / np.linalg.norm(tangents, axis=1)[:, np.newaxis]
@@ -87,8 +87,13 @@ class ObstacleHandler:
             
             vector_to_point = point - closest_point
             d = np.dot(vector_to_point, normal)
-            s = np.sum(np.linalg.norm(np.diff(centerline[:closest_index + 1], axis=0), axis=0))
-            
+
+            s = np.sum(np.linalg.norm(np.diff(centerline[:closest_index + 1], axis=0), axis=1))
+
+            vector_from_start = point - centerline[0]  
+            if np.dot(tangents[0], vector_from_start) < 0:  
+                s = -np.linalg.norm(vector_from_start)  
+
             return s, d
         else:
             return None
